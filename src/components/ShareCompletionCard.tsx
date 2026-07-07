@@ -1,8 +1,9 @@
 // Renders after an investigation completes. Turns the verdict into a
-// one-tap shareable card (WhatsApp / Telegram / copy link).
+// one-tap shareable card (copy link / native share).
 
 import { useState } from "react";
-import { Check, Copy, MessageCircle, Send, Share2 } from "lucide-react";
+import { Check, Copy, Share2 } from "lucide-react";
+
 
 type Props = {
   slug: string;
