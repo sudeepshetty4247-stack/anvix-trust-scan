@@ -5,6 +5,7 @@
 import type { GuestResult } from "./guest.functions";
 import type { ExtractedEvidence } from "./evidence.functions";
 import type { Narrative } from "./narrative.functions";
+import type { IdentityGraph, OfferForensics } from "./forensics.functions";
 
 const CURRENT = "anvix:guest:current";
 const HISTORY = "anvix:guest:history";
@@ -12,8 +13,10 @@ const MAX_HISTORY = 20;
 
 export type GuestEvidenceItem = ExtractedEvidence & {
   id: string;
-  preview_data_url?: string; // for images: small preview to render
+  preview_data_url?: string;
   original_size?: number;
+  // Kept transiently for offer-letter forensics; stripped before persistence.
+  pdf_base64?: string;
 };
 
 export type GuestRecord = {
@@ -28,6 +31,8 @@ export type GuestRecord = {
   };
   result: GuestResult;
   narrative?: Narrative;
+  identity_graph?: IdentityGraph;
+  offer_forensics?: OfferForensics[];
 };
 
 const safe = <T>(fn: () => T, fallback: T): T => {
