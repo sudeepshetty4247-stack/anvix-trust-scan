@@ -58,6 +58,8 @@ import {
   Network,
   ChevronDown,
   MessagesSquare,
+  Home,
+  LayoutDashboard,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -91,6 +93,8 @@ function GuestInvestigate() {
   const [record, setRecord] = useState<GuestRecord | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
+  const [savedInvestigationId, setSavedInvestigationId] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState<null | "save" | "download">(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
@@ -100,32 +104,46 @@ function GuestInvestigate() {
     const r = readGuestCurrent();
     if (r) setRecord(r);
 
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setIsAuthed(Boolean(data.session));
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthed(Boolean(session));
+    });
+
     // Hydrate from ?intake=... (Chrome extension context-menu deep link)
     try {
       const usp = new URLSearchParams(window.location.search);
       const raw = usp.get("intake");
-      if (!raw) return;
-      const pad = raw.length % 4 === 0 ? "" : "=".repeat(4 - (raw.length % 4));
-      const b64 = raw.replace(/-/g, "+").replace(/_/g, "/") + pad;
-      const decoded = decodeURIComponent(escape(atob(b64)));
-      const intake = JSON.parse(decoded) as {
-        v?: number;
-        source_url?: string;
-        source_title?: string;
-        selection?: string;
-        link_url?: string;
-        channel?: string;
-      };
-      if (intake.selection) setFreeText(intake.selection);
-      if (intake.source_url || intake.link_url) setFreeUrl(intake.link_url || intake.source_url || "");
-      const label = intake.source_title || intake.channel || "Investigation from extension";
-      setCaseName(`[${(intake.channel || "web").toUpperCase()}] ${label}`.slice(0, 120));
-      toast.success("Evidence loaded from Chrome extension.");
-      // Clean the URL so a page refresh doesn't reload the intake.
-      window.history.replaceState({}, "", window.location.pathname);
+      if (raw) {
+        const pad = raw.length % 4 === 0 ? "" : "=".repeat(4 - (raw.length % 4));
+        const b64 = raw.replace(/-/g, "+").replace(/_/g, "/") + pad;
+        const decoded = decodeURIComponent(escape(atob(b64)));
+        const intake = JSON.parse(decoded) as {
+          v?: number;
+          source_url?: string;
+          source_title?: string;
+          selection?: string;
+          link_url?: string;
+          channel?: string;
+        };
+        if (intake.selection) setFreeText(intake.selection);
+        if (intake.source_url || intake.link_url) setFreeUrl(intake.link_url || intake.source_url || "");
+        const label = intake.source_title || intake.channel || "Investigation from extension";
+        setCaseName(`[${(intake.channel || "web").toUpperCase()}] ${label}`.slice(0, 120));
+        toast.success("Evidence loaded from Chrome extension.");
+        // Clean the URL so a page refresh doesn't reload the intake.
+        window.history.replaceState({}, "", window.location.pathname);
+      }
     } catch {
       /* ignore malformed intake */
     }
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
 
@@ -389,6 +407,7 @@ function GuestInvestigate() {
   const reset = () => {
     clearGuestCurrent();
     setRecord(null);
+    setSavedInvestigationId(null);
     setEvidence([]);
     setFreeUrl("");
     setFreeEmail("");
@@ -405,6 +424,10 @@ function GuestInvestigate() {
 
   const doSave = async () => {
     if (!record) return;
+    if (savedInvestigationId) {
+      toast.success("Already saved to your history");
+      return;
+    }
     if (!(await requireAuth("save"))) return;
     setClaiming(true);
     try {
@@ -415,9 +438,8 @@ function GuestInvestigate() {
           result: record.result,
         },
       });
-      toast.success("Saved to your account");
-      clearGuestCurrent();
-      navigate({ to: "/investigations/$id", params: { id } });
+      setSavedInvestigationId(id);
+      toast.success("Saved to your history");
     } catch (e) {
       toast.error((e as Error).message || "Save failed");
     } finally {
@@ -474,27 +496,36 @@ function GuestInvestigate() {
         </div>
       )}
 
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+      <header className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-6 py-5 sm:flex sm:justify-between">
         <Link
           to="/"
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <Home className="h-4 w-4 shrink-0" /> Home
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 sm:flex">
           <div className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 ring-1 ring-primary/30">
             <ShieldCheck className="h-4 w-4 text-primary" />
           </div>
           <span className="font-semibold">
-            ANVIX <span className="text-xs text-muted-foreground">· guest mode</span>
+            ANVIX <span className="text-xs text-muted-foreground">· {isAuthed ? "signed in" : "guest mode"}</span>
           </span>
         </div>
-        <Link
-          to="/auth"
-          className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-accent"
-        >
-          Sign in
-        </Link>
+        {isAuthed ? (
+          <Link
+            to="/dashboard"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-accent"
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" /> History
+          </Link>
+        ) : (
+          <Link
+            to="/auth"
+            className="shrink-0 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-accent"
+          >
+            Sign in
+          </Link>
+        )}
       </header>
 
       <main className="mx-auto max-w-5xl px-6 pb-24">
@@ -626,6 +657,8 @@ function GuestInvestigate() {
             onDownload={doDownload}
             saving={claiming}
             downloading={downloading}
+            isAuthed={isAuthed}
+            saved={Boolean(savedInvestigationId)}
           />
         )}
       </main>
