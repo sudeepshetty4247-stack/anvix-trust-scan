@@ -1236,17 +1236,19 @@ function ReportView({
         </div>
       )}
 
-      {/* Verifications */}
-      <div className="glass rounded-2xl p-6">
-        <div className="mb-3 text-sm font-medium">
-          Live verifications ({r.verifications.length})
+      {/* Verifications — technical, only when accordion is open */}
+      {techOpen && (
+        <div className="glass rounded-2xl p-6">
+          <div className="mb-3 text-sm font-medium">
+            Live verifications ({r.verifications.length})
+          </div>
+          <ul className="divide-y divide-border/60">
+            {r.verifications.map((v, i) => (
+              <VItem key={i} v={v} />
+            ))}
+          </ul>
         </div>
-        <ul className="divide-y divide-border/60">
-          {r.verifications.map((v, i) => (
-            <VItem key={i} v={v} />
-          ))}
-        </ul>
-      </div>
+      )}
 
       {/* Missing */}
       {r.missing_evidence.length > 0 && (
