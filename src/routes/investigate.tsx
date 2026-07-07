@@ -45,6 +45,9 @@ import {
   Brain,
   TargetIcon,
   PlayCircle,
+  Users,
+  FileWarning,
+  Network,
 } from "lucide-react";
 import { toast } from "sonner";
 
