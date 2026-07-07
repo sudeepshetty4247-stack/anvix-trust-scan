@@ -404,6 +404,12 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       confidence: weighted.confidence,
       model_used: `ANVIX-Blend-v2 (Kaggle-Ensemble LR+GBM 65% + Weighted-Baseline 35%)`,
       fraud_probability: Math.round(ens.ensemble * 10000) / 10000,
+      ensemble_breakdown: {
+        lr: Math.round(ens.lr * 10000) / 10000,
+        gbm: Math.round(ens.gbm * 10000) / 10000,
+        ensemble: Math.round(ens.ensemble * 10000) / 10000,
+        threshold: ens.threshold,
+      },
       kaggle_features: kf,
       kaggle_contributions: Object.fromEntries(
         Object.entries(kaggleContribs).map(([k, v]) => [k, Math.round(v * 1000) / 1000]),
