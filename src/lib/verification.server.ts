@@ -78,6 +78,25 @@ const URGENCY_TERMS = [
   "expires",
 ];
 
+const NEGATION_RE = /\b(no|not|never|without|none|free of|does not|do not|is not|isn't|won't|will not|not required|no need)\b/i;
+
+function isNegatedMention(text: string, phrase: string): boolean {
+  const lower = text.toLowerCase();
+  const target = phrase.toLowerCase();
+  let start = lower.indexOf(target);
+  while (start !== -1) {
+    const before = lower.slice(Math.max(0, start - 90), start);
+    const after = lower.slice(start + target.length, Math.min(lower.length, start + target.length + 55));
+    const sameClauseBefore = before.split(/[.!?;:\n]/).pop() ?? before;
+    const sameClauseAfter = after.split(/[.!?;:\n]/)[0] ?? after;
+    if (NEGATION_RE.test(sameClauseBefore) || /\b(required|needed|asked|charged|taken|collected)\b/i.test(sameClauseAfter) && NEGATION_RE.test(`${sameClauseBefore} ${sameClauseAfter}`)) {
+      return true;
+    }
+    start = lower.indexOf(target, start + target.length);
+  }
+  return false;
+}
+
 export function extractDomain(input: string): string | null {
   try {
     const s = input.trim();
@@ -95,7 +114,7 @@ export function extractEmails(text: string): string[] {
 }
 
 export function extractUrls(text: string): string[] {
-  return Array.from(new Set(text.match(/https?:\/\/[^\s"'<>)]+/gi) ?? []));
+  return Array.from(new Set(text.match(/https?:\/\/[^\s,"'<>)]+/gi) ?? []));
 }
 
 async function doh(name: string, type: string): Promise<any> {
@@ -253,11 +272,12 @@ export function analyzeText(text: string): {
   grammar: CheckResult;
 } {
   const t = text.toLowerCase();
-  const foundFraud = FRAUD_KEYWORDS.filter((k) => t.includes(k));
+  const foundFraud = FRAUD_KEYWORDS.filter((k) => t.includes(k) && !isNegatedMention(text, k));
   const foundUrg = URGENCY_TERMS.filter((k) => t.includes(k));
   const paymentHit =
     /\b(pay|deposit|transfer|wire|remit|fee)\b/.test(t) &&
-    /\b(\$|₹|usd|inr|eur|gbp|bitcoin|btc)\b/.test(t);
+    /\b(\$|₹|usd|inr|eur|gbp|bitcoin|btc)\b/.test(t) &&
+    !/\b(no|not|never|without)\b[^.!?\n]{0,90}\b(pay|payment|fee|deposit|transfer|money|required|needed)\b/i.test(text);
   const cryptoHit = /(bitcoin|btc|usdt|ethereum|eth|crypto\s*(wallet|payment))/.test(t);
 
   // very rough grammar heuristic: proportion of ALL CAPS words + exclamations

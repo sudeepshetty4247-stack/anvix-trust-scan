@@ -11,6 +11,8 @@ import {
   checkWebsite,
   checkWhois,
   extractDomain,
+  extractEmails,
+  extractUrls,
   isFreeEmail,
   suspiciousTld,
   type CheckResult,
@@ -133,16 +135,18 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
     // Aggregate all inputs — free-typed and extracted-from-evidence
+    const textUrls = extractUrls(data.text);
+    const textEmails = extractEmails(data.text);
     const aggregatedUrls = Array.from(
       new Set(
-        [...data.urls, ...data.evidence.flatMap((e) => e.urls)]
+        [...data.urls, ...textUrls, ...data.evidence.flatMap((e) => e.urls)]
           .map((u) => u.trim())
           .filter(Boolean),
       ),
     );
     const aggregatedEmails = Array.from(
       new Set(
-        [...data.emails, ...data.evidence.flatMap((e) => e.emails)]
+        [...data.emails, ...textEmails, ...data.evidence.flatMap((e) => e.emails)]
           .map((e) => e.trim().toLowerCase())
           .filter(Boolean),
       ),
@@ -297,16 +301,25 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       ),
     ]);
 
-    if (communitySignals.length > 0) {
-      const worst = communitySignals.reduce(
+    const hasConcreteScamSignal =
+      tx.fraud.status === "fail" ||
+      tx.payment.status === "fail" ||
+      suspiciousPayments.length > 0 ||
+      tx.crypto.status === "fail" ||
+      anySusTld ||
+      freeEmailCount > 0;
+    const effectiveCommunitySignals = hasConcreteScamSignal ? communitySignals : [];
+
+    if (effectiveCommunitySignals.length > 0) {
+      const worst = effectiveCommunitySignals.reduce(
         (a, b) => (b.report_count > a.report_count ? b : a),
-        communitySignals[0],
+        effectiveCommunitySignals[0],
       );
       push("community", "Previously reported by other users", {
         status: worst.severity === "info" ? "warning" : "fail",
         score: 1,
-        detail: `${communitySignals.length} identifier(s) matched the global scam-signals database (top: ${worst.matched_preview}, reported ${worst.report_count} time(s), first seen ${new Date(worst.first_seen).toISOString().slice(0, 10)}).`,
-        data: communitySignals,
+        detail: `${effectiveCommunitySignals.length} identifier(s) matched the global scam-signals database (top: ${worst.matched_preview}, reported ${worst.report_count} time(s), first seen ${new Date(worst.first_seen).toISOString().slice(0, 10)}).`,
+        data: effectiveCommunitySignals,
       });
     }
 
@@ -358,10 +371,10 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       dmarc,
       official_email_match: officialMatch,
       website_reachable: web,
-      fraud_keywords: 1 - tx.fraud.score,
-      payment_request: tx.payment.status === "fail" || suspiciousPayments.length > 0 ? 0 : 1,
-      crypto_mention: 1 - tx.crypto.score,
-      urgency_score: 1 - tx.urgency.score,
+      fraud_keywords: tx.fraud.score,
+      payment_request: tx.payment.status === "fail" || suspiciousPayments.length > 0 ? 1 : 0,
+      crypto_mention: tx.crypto.score,
+      urgency_score: tx.urgency.score,
       grammar_quality: tx.grammar.score,
       evidence_count: Math.min(
         1,
@@ -380,18 +393,18 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
           4,
       ),
       cross_source_consistency: officialMatch,
-      suspicious_tld: anySusTld ? 0 : 1,
+      suspicious_tld: anySusTld ? 1 : 0,
       free_email_recruiter: aggregatedEmails.length
-        ? 1 - Math.min(1, freeEmailCount / aggregatedEmails.length)
-        : 0.5,
+        ? Math.min(1, freeEmailCount / aggregatedEmails.length)
+        : 0,
     };
     const weighted = scoreFeatures(wf);
 
-    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (60%) with weighted baseline (30%),
+    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (60%) with weighted baseline (40%),
     //    then apply community-intelligence + live-verification penalties (up to -25).
     const trust_from_ml = Math.round((1 - ens.ensemble) * 100);
-    const base_trust = Math.round(trust_from_ml * 0.6 + weighted.score * 0.3);
-    const communityPenalty = communitySignals.reduce((acc, s) => {
+    const base_trust = Math.round(trust_from_ml * 0.6 + weighted.score * 0.4);
+    const communityPenalty = effectiveCommunitySignals.reduce((acc, s) => {
       const w = s.severity === "critical" ? 12 : s.severity === "high" ? 8 : s.severity === "warning" ? 4 : 2;
       return acc + Math.min(w, w * Math.log2(1 + s.report_count) / 2);
     }, 0);
@@ -400,8 +413,9 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     // the model has nothing to trust — hard-cap the score so it can't
     // accidentally read as "safe". Real scams often arrive as a single
     // sentence with no proof, and those must NOT score in the 40s+.
-    const noEvidencePenalty =
-      data.evidence.length === 0 || aggregatedText.trim().length < 40 ? 40 : 0;
+    const hasActionableEvidence =
+      aggregatedUrls.length > 0 || aggregatedEmails.length > 0 || aggregatedText.trim().length >= 40;
+    const noEvidencePenalty = hasActionableEvidence ? 0 : 40;
     const trust = Math.max(
       0,
       Math.min(100, Math.round(base_trust - communityPenalty - livePenalty - noEvidencePenalty)),
@@ -429,7 +443,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
         screenshot: data.evidence.some((e) => /image|screenshot|png|jpg/i.test(e.kind)),
         text: aggregatedText.length > 100,
       },
-      community_hits: communitySignals.length,
+      community_hits: effectiveCommunitySignals.length,
     });
 
     // -- Explainability text --
@@ -487,7 +501,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       trust_score: trust,
       risk_category: category,
       confidence: weighted.confidence,
-      model_used: `ANVIX-Blend-v3 (Ensemble 60% + Weighted 30% \u2212 Community/Live penalties)`,
+      model_used: `ANVIX-Blend-v3 (Ensemble 60% + Weighted 40% \u2212 Community/Live penalties)`,
       fraud_probability: Math.round(ens.ensemble * 10000) / 10000,
       ensemble_breakdown: {
         lr: Math.round(ens.lr * 10000) / 10000,
@@ -513,7 +527,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       missing_evidence: missing,
       recommendation,
       verifications_summary,
-      community_signals: communitySignals,
+      community_signals: effectiveCommunitySignals,
       live_verification: liveVerification,
       confidence_band,
       model_metadata: {
@@ -525,16 +539,20 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       },
     };
 
-    // Report new signals to the community (fire-and-forget; best-effort).
-    reportSignalsCore({
-      emails: aggregatedEmails,
-      phones: aggregatedPhones,
-      domains,
-      payment_handles: suspiciousPayments,
-      offer_patterns: offerPatternHits,
-      severity: trust < 30 ? "critical" : trust < 50 ? "high" : trust < 70 ? "warning" : "info",
-      sample_context: data.name.slice(0, 120),
-    }).catch(() => void 0);
+    // Report only concrete high-risk scam indicators. Never seed clean company
+    // domains/emails from caution or safe cases, or future legit checks can be
+    // poisoned by false community matches.
+    if (trust < 50 && (suspiciousPayments.length > 0 || offerPatternHits.length > 0 || freeEmailCount > 0)) {
+      reportSignalsCore({
+        emails: aggregatedEmails.filter((e) => FREE_EMAIL_DOMS.has(e.split("@")[1] ?? "")),
+        phones: aggregatedPhones,
+        domains: anySusTld ? domains : [],
+        payment_handles: suspiciousPayments,
+        offer_patterns: offerPatternHits,
+        severity: trust < 30 ? "critical" : "high",
+        sample_context: data.name.slice(0, 120),
+      }).catch(() => void 0);
+    }
 
     return result;
   });
