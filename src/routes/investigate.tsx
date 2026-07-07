@@ -946,6 +946,59 @@ function ReportView({
         />
       )}
 
+      {/* Rescue Kit — FIR + Trap Reply, available immediately (no sign-in) */}
+      <section
+        className={`glass rounded-2xl border p-5 sm:p-6 ${
+          isHighRisk ? "border-destructive/30" : "border-border/70"
+        }`}
+      >
+        <div
+          className={`mono text-[11px] uppercase tracking-[0.22em] ${
+            isHighRisk ? "text-destructive" : "text-primary"
+          }`}
+        >
+          ANVIX Rescue Kit
+        </div>
+        <h2 className="mt-1 text-lg font-semibold tracking-tight">
+          {isHighRisk
+            ? "Take the next step — fast"
+            : "Tools you can use if this turns out to be a scam"}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isHighRisk
+            ? "If money was lost, file a cybercrime complaint within 24 hours. If the scammer is still messaging you, extract more evidence with a safe reply."
+            : "Generate a pre-filled cybercrime FIR, or craft a safe reply to extract more evidence from the recruiter."}
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setFirOpen(true)}
+            className="group flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10"
+          >
+            <FileWarning className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <div className="text-sm font-semibold">Generate cybercrime complaint (FIR)</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                Pre-filled PDF ready to attach at cybercrime.gov.in
+              </div>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTrapOpen(true)}
+            className="group flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 text-left hover:bg-primary/10"
+          >
+            <MessagesSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <div className="text-sm font-semibold">Generate a safe trap reply</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                3 messages that extract more evidence without spooking them
+              </div>
+            </div>
+          </button>
+        </div>
+      </section>
+
       {/* Community intelligence — the network-effect moment */}
       {r.community_signals.length > 0 && (
         <div className="glass overflow-hidden rounded-2xl border border-destructive/40 bg-destructive/5">
