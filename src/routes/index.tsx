@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -16,14 +16,26 @@ import { CHROME_STORE_URL, CHROME_EXTENSION_ZIP_PATH } from "@/lib/constants";
 
 export const Route = createFileRoute("/")({
   ssr: false,
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/dashboard" });
-  },
   component: Landing,
 });
 
 function Landing() {
+  const [isAuthed, setIsAuthed] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setIsAuthed(Boolean(data.session));
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthed(Boolean(session));
+    });
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
@@ -44,7 +56,7 @@ function Landing() {
             to="/auth"
             className="rounded-md border border-border bg-surface px-3.5 py-1.5 text-sm hover:bg-accent"
           >
-            Sign in
+            {isAuthed ? "Dashboard" : "Sign in"}
           </Link>
         </div>
       </header>

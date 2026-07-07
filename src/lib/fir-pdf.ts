@@ -24,18 +24,24 @@ type Ctx = {
 function san(s: unknown): string {
   const t = String(s ?? "");
   return t
+    .normalize("NFKD")
     .replace(/[\u2192\u21D2]/g, "->")
     .replace(/[\u2190\u21D0]/g, "<-")
+    .replace(/[\u2191\u21D1]/g, "^")
+    .replace(/[\u2193\u21D3]/g, "v")
     .replace(/[\u2713\u2714]/g, "OK")
     .replace(/[\u2717\u2718\u2715\u274C]/g, "X")
     .replace(/[\u2022\u25CF\u25AA\u25A0]/g, "-")
-    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g, "-")
     .replace(/[\u2018\u2019\u201A]/g, "'")
     .replace(/[\u201C\u201D\u201E]/g, '"')
     .replace(/\u2026/g, "...")
-    .replace(/\u00B7/g, "·")
+    .replace(/[\u00B7\u22C5]/g, "-")
+    .replace(/[\u00D7]/g, "x")
+    .replace(/[\u00F7]/g, "/")
+    .replace(/[\u00B1]/g, "+/-")
     .replace(/\u20B9/g, "Rs.")
-    .replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "?");
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "?");
 }
 function patchPage(page: PDFPage): PDFPage {
   const orig = page.drawText.bind(page);
@@ -62,7 +68,7 @@ function line(ctx: Ctx) {
   ctx.y -= 10;
 }
 function wrap(text: string, font: PDFFont, size: number, max: number): string[] {
-  const paras = text.replace(/\r/g, "").split("\n");
+  const paras = san(text).replace(/\r/g, "").split("\n");
   const out: string[] = [];
   for (const p of paras) {
     if (!p.trim()) {
@@ -314,11 +320,15 @@ export async function generateCybercrimeFIRPDF(inputs: FIRInputs): Promise<Uint8
 }
 
 export function downloadFIRPDF(bytes: Uint8Array, filename = "anvix-cybercrime-complaint.pdf") {
-  const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
+  const arrayBuffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(arrayBuffer).set(bytes);
+  const blob = new Blob([arrayBuffer], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
