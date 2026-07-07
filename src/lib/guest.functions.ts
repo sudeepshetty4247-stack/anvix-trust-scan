@@ -92,6 +92,7 @@ export type GuestResult = {
   verifications_summary: string;
   community_signals: SignalMatch[];
   live_verification: LiveVerificationResult;
+  confidence_band: ConfidenceResult;
   model_metadata: {
     trained_on: string;
     n_rows: number;
