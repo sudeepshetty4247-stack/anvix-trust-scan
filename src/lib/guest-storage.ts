@@ -1,0 +1,60 @@
+// Guest investigations live entirely in localStorage. No DB, no auth, no cookies.
+// When the user clicks "Save to history", the current record is claimed into
+// their account via the authenticated claimGuestInvestigation server fn.
+
+import type { GuestResult } from "./guest.functions";
+
+const CURRENT = "anvix:guest:current";
+const HISTORY = "anvix:guest:history";
+const MAX_HISTORY = 20;
+
+export type GuestRecord = {
+  id: string; // client-generated
+  name: string;
+  createdAt: string;
+  input: {
+    urls: string[];
+    emails: string[];
+    text: string;
+  };
+  result: GuestResult;
+};
+
+const safe = <T,>(fn: () => T, fallback: T): T => {
+  try { return fn(); } catch { return fallback; }
+};
+
+export function saveGuestCurrent(rec: GuestRecord) {
+  if (typeof window === "undefined") return;
+  safe(() => localStorage.setItem(CURRENT, JSON.stringify(rec)), undefined);
+  const hist = readGuestHistory();
+  const next = [rec, ...hist.filter((h) => h.id !== rec.id)].slice(0, MAX_HISTORY);
+  safe(() => localStorage.setItem(HISTORY, JSON.stringify(next)), undefined);
+}
+
+export function readGuestCurrent(): GuestRecord | null {
+  if (typeof window === "undefined") return null;
+  return safe(() => {
+    const raw = localStorage.getItem(CURRENT);
+    return raw ? (JSON.parse(raw) as GuestRecord) : null;
+  }, null);
+}
+
+export function clearGuestCurrent() {
+  if (typeof window === "undefined") return;
+  safe(() => localStorage.removeItem(CURRENT), undefined);
+}
+
+export function readGuestHistory(): GuestRecord[] {
+  if (typeof window === "undefined") return [];
+  return safe(() => {
+    const raw = localStorage.getItem(HISTORY);
+    return raw ? (JSON.parse(raw) as GuestRecord[]) : [];
+  }, []);
+}
+
+export function removeGuestHistory(id: string) {
+  if (typeof window === "undefined") return;
+  const next = readGuestHistory().filter((h) => h.id !== id);
+  safe(() => localStorage.setItem(HISTORY, JSON.stringify(next)), undefined);
+}
