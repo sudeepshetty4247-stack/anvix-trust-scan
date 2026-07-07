@@ -1,9 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { StartInvestigationDialog } from "@/components/StartInvestigationDialog";
 import { listInvestigations, dashboardStats } from "@/lib/investigations.functions";
 import { Plus, ArrowUpRight, FileSearch, ShieldCheck, TrendingUp, FolderOpen } from "lucide-react";
 import { RISK_META, type RiskCategory } from "@/lib/scoring";
@@ -14,9 +12,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const listFn = useServerFn(listInvestigations);
   const statsFn = useServerFn(dashboardStats);
 
@@ -25,9 +21,10 @@ function Dashboard() {
 
   const investigations = list.data ?? [];
   const hasAny = investigations.length > 0;
+  const startInvestigation = () => navigate({ to: "/investigate" });
 
   return (
-    <AppShell onNewInvestigation={() => setOpen(true)}>
+    <AppShell onNewInvestigation={startInvestigation}>
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex items-end justify-between">
           <div>
@@ -35,14 +32,14 @@ function Dashboard() {
             <p className="mt-1 text-sm text-muted-foreground">Every case you run appears here.</p>
           </div>
           <button
-            onClick={() => setOpen(true)}
+            onClick={startInvestigation}
             className="hidden items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 md:inline-flex"
           >
             <Plus className="h-4 w-4" /> Start investigation
           </button>
         </div>
 
-        {!list.isLoading && !hasAny && <EmptyState onStart={() => setOpen(true)} />}
+        {!list.isLoading && !hasAny && <EmptyState onStart={startInvestigation} />}
 
         {hasAny && (
           <>
@@ -111,16 +108,6 @@ function Dashboard() {
           </>
         )}
       </div>
-
-      <StartInvestigationDialog
-        open={open}
-        onOpenChange={setOpen}
-        onCreated={(id) => {
-          setOpen(false);
-          qc.invalidateQueries({ queryKey: ["investigations"] });
-          navigate({ to: "/investigations/$id", params: { id } });
-        }}
-      />
     </AppShell>
   );
 }
