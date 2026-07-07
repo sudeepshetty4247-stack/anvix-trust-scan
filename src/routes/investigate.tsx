@@ -87,7 +87,35 @@ function GuestInvestigate() {
   useEffect(() => {
     const r = readGuestCurrent();
     if (r) setRecord(r);
+
+    // Hydrate from ?intake=... (Chrome extension context-menu deep link)
+    try {
+      const usp = new URLSearchParams(window.location.search);
+      const raw = usp.get("intake");
+      if (!raw) return;
+      const pad = raw.length % 4 === 0 ? "" : "=".repeat(4 - (raw.length % 4));
+      const b64 = raw.replace(/-/g, "+").replace(/_/g, "/") + pad;
+      const decoded = decodeURIComponent(escape(atob(b64)));
+      const intake = JSON.parse(decoded) as {
+        v?: number;
+        source_url?: string;
+        source_title?: string;
+        selection?: string;
+        link_url?: string;
+        channel?: string;
+      };
+      if (intake.selection) setFreeText(intake.selection);
+      if (intake.source_url || intake.link_url) setFreeUrl(intake.link_url || intake.source_url || "");
+      const label = intake.source_title || intake.channel || "Investigation from extension";
+      setCaseName(`[${(intake.channel || "web").toUpperCase()}] ${label}`.slice(0, 120));
+      toast.success("Evidence loaded from Chrome extension.");
+      // Clean the URL so a page refresh doesn't reload the intake.
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {
+      /* ignore malformed intake */
+    }
   }, []);
+
 
   const addFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -833,6 +861,85 @@ function ReportView({
           <span className="font-medium text-primary">Recommendation:</span> {r.recommendation}
         </div>
       </div>
+
+      {/* Community intelligence — the network-effect moment */}
+      {r.community_signals.length > 0 && (
+        <div className="glass overflow-hidden rounded-2xl border border-destructive/40 bg-destructive/5">
+          <div className="border-b border-destructive/30 bg-destructive/10 px-6 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <AlertTriangle className="h-4 w-4" /> Previously reported by other ANVIX users
+            </div>
+          </div>
+          <div className="space-y-3 p-6">
+            <p className="text-sm text-muted-foreground">
+              {r.community_signals.length} identifier(s) from this investigation match
+              scam signals reported by other users or curated databases.
+              Each match reduced the trust score.
+            </p>
+            <ul className="space-y-2">
+              {r.community_signals.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-surface/60 p-3 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-destructive">
+                      {s.kind}
+                    </span>
+                    <span className="font-mono text-xs">{s.matched_preview}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Reported <span className="font-semibold text-foreground">{s.report_count}\u00d7</span>{" "}
+                    · first seen {new Date(s.first_seen).toISOString().slice(0, 10)}
+                    {s.sample_context ? ` · ${s.sample_context}` : ""}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Live verification — real-world checks */}
+      {r.live_verification.checks.length > 0 && (
+        <div className="glass overflow-hidden rounded-2xl border border-border/60">
+          <div className="border-b border-border/40 px-6 py-3">
+            <div className="flex items-center justify-between gap-2 text-sm font-semibold">
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" /> Live real-world verification
+              </span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {r.live_verification.summary.passed} passed ·{" "}
+                {r.live_verification.summary.failed} failed ·{" "}
+                {r.live_verification.summary.warnings} warning ·{" "}
+                {r.live_verification.summary.skipped} skipped
+              </span>
+            </div>
+          </div>
+          <ul className="divide-y divide-border/40">
+            {r.live_verification.checks.map((c, i) => {
+              const dot =
+                c.status === "pass"
+                  ? "bg-success"
+                  : c.status === "fail"
+                    ? "bg-destructive"
+                    : c.status === "warning"
+                      ? "bg-warning"
+                      : "bg-muted-foreground/40";
+              return (
+                <li key={i} className="flex items-start gap-3 px-6 py-3 text-sm">
+                  <span className={`mt-1.5 h-2 w-2 rounded-full ${dot}`} />
+                  <div className="flex-1">
+                    <div className="font-medium">{c.name}</div>
+                    <div className="text-xs text-muted-foreground">{c.detail}</div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
 
       {/* Playbook match — the wow moment */}
       {n?.playbook.playbook_id && (

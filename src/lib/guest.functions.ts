@@ -23,6 +23,15 @@ import {
   type KaggleFeatures,
 } from "./kaggle-model";
 import { scoreFeatures, type RiskCategory } from "./scoring";
+import {
+  checkGlobalSignalsCore,
+  reportSignalsCore,
+  type SignalMatch,
+} from "./global-signals.functions";
+import {
+  runLiveVerificationCore,
+  type LiveVerificationResult,
+} from "./verification-live.functions";
 
 const EvidenceItem = z.object({
   kind: z.string(),
@@ -80,6 +89,8 @@ export type GuestResult = {
   missing_evidence: string[];
   recommendation: string;
   verifications_summary: string;
+  community_signals: SignalMatch[];
+  live_verification: LiveVerificationResult;
   model_metadata: {
     trained_on: string;
     n_rows: number;
@@ -259,7 +270,48 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
           : "Email domain does not match website domain",
     });
 
-    // -- Kaggle-LR features --
+    // -- Community intelligence: match against global_signals table --
+    const offerPatternHits = ((tx.fraud.data as string[] | undefined) ?? []).slice(0, 5);
+    const [communitySignals, liveVerification] = await Promise.all([
+      checkGlobalSignalsCore({
+        emails: aggregatedEmails,
+        phones: aggregatedPhones,
+        domains,
+        payment_handles: suspiciousPayments,
+        offer_patterns: offerPatternHits,
+      }).catch(() => [] as SignalMatch[]),
+      runLiveVerificationCore({
+        companies: aggregatedCompanies,
+        recruiter_names: Array.from(new Set(data.evidence.flatMap((e) => e.people))).slice(0, 3),
+        role: data.name,
+        location: "",
+        salary_text: Array.from(new Set(data.evidence.flatMap((e) => e.amounts))).join(", "),
+      }).catch(
+        () =>
+          ({
+            checks: [],
+            summary: { passed: 0, failed: 0, warnings: 0, skipped: 0 },
+          }) as LiveVerificationResult,
+      ),
+    ]);
+
+    if (communitySignals.length > 0) {
+      const worst = communitySignals.reduce(
+        (a, b) => (b.report_count > a.report_count ? b : a),
+        communitySignals[0],
+      );
+      push("community", "Previously reported by other users", {
+        status: worst.severity === "info" ? "warning" : "fail",
+        score: 1,
+        detail: `${communitySignals.length} identifier(s) matched the global scam-signals database (top: ${worst.matched_preview}, reported ${worst.report_count} time(s), first seen ${new Date(worst.first_seen).toISOString().slice(0, 10)}).`,
+        data: communitySignals,
+      });
+    }
+
+    for (const c of liveVerification.checks) {
+      push("live", c.name, { status: c.status, score: c.status === "pass" ? 1 : 0, detail: c.detail, data: c.data });
+    }
+
     const kf: KaggleFeatures = {
       fraud_keywords_norm: Math.min(1, ((tx.fraud.data as string[] | undefined)?.length ?? 0) / 5),
       urgency_norm: Math.min(1, ((tx.urgency.data as string[] | undefined)?.length ?? 0) / 3),
@@ -333,9 +385,16 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     };
     const weighted = scoreFeatures(wf);
 
-    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (65%) with weighted baseline (35%) --
+    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (60%) with weighted baseline (30%),
+    //    then apply community-intelligence + live-verification penalties (up to -25).
     const trust_from_ml = Math.round((1 - ens.ensemble) * 100);
-    const trust = Math.round(trust_from_ml * 0.65 + weighted.score * 0.35);
+    const base_trust = Math.round(trust_from_ml * 0.6 + weighted.score * 0.3);
+    const communityPenalty = communitySignals.reduce((acc, s) => {
+      const w = s.severity === "critical" ? 12 : s.severity === "high" ? 8 : s.severity === "warning" ? 4 : 2;
+      return acc + Math.min(w, w * Math.log2(1 + s.report_count) / 2);
+    }, 0);
+    const livePenalty = liveVerification.summary.failed * 4 + liveVerification.summary.warnings * 2;
+    const trust = Math.max(0, Math.min(100, Math.round(base_trust - communityPenalty - livePenalty)));
     const category: RiskCategory =
       trust >= 85
         ? "trusted"
@@ -402,7 +461,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       trust_score: trust,
       risk_category: category,
       confidence: weighted.confidence,
-      model_used: `ANVIX-Blend-v2 (Kaggle-Ensemble LR+GBM 65% + Weighted-Baseline 35%)`,
+      model_used: `ANVIX-Blend-v3 (Ensemble 60% + Weighted 30% \u2212 Community/Live penalties)`,
       fraud_probability: Math.round(ens.ensemble * 10000) / 10000,
       ensemble_breakdown: {
         lr: Math.round(ens.lr * 10000) / 10000,
@@ -428,6 +487,8 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       missing_evidence: missing,
       recommendation,
       verifications_summary,
+      community_signals: communitySignals,
+      live_verification: liveVerification,
       model_metadata: {
         trained_on: KAGGLE_MODEL.trained_on,
         n_rows: KAGGLE_MODEL.n_rows,
@@ -436,5 +497,17 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
         metrics: KAGGLE_MODEL.metrics,
       },
     };
+
+    // Report new signals to the community (fire-and-forget; best-effort).
+    reportSignalsCore({
+      emails: aggregatedEmails,
+      phones: aggregatedPhones,
+      domains,
+      payment_handles: suspiciousPayments,
+      offer_patterns: offerPatternHits,
+      severity: trust < 30 ? "critical" : trust < 50 ? "high" : trust < 70 ? "warning" : "info",
+      sample_context: data.name.slice(0, 120),
+    }).catch(() => void 0);
+
     return result;
   });
