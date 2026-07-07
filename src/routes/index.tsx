@@ -116,7 +116,6 @@ function Landing() {
           ))}
         </section>
 
-        <SignalCloudSection />
         <RecentlySharedSection />
         <ChromeExtensionSection />
       </main>
