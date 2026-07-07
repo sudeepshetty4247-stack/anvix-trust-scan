@@ -22,7 +22,7 @@ export const runInvestigation = createServerFn({ method: "POST" })
     const invId = data.investigation_id;
 
     const log = async (message: string, level: "info" | "warn" | "error" = "info", meta: Record<string, unknown> = {}) => {
-      await supabase.from("activities").insert({ investigation_id: invId, user_id: userId, level, message, meta });
+      await supabase.from("activities").insert({ investigation_id: invId, user_id: userId, level, message, meta: meta as any });
     };
     const setStatus = async (status: string, progress: number) => {
       await supabase.from("investigations").update({ status: status as any, progress }).eq("id", invId);
@@ -31,7 +31,7 @@ export const runInvestigation = createServerFn({ method: "POST" })
       await supabase.from("verifications").insert({
         investigation_id: invId, user_id: userId, category, check_name: name,
         status: result.status === "skipped" ? "skipped" : result.status,
-        result: (result as unknown as Record<string, unknown>), score: result.score, weight,
+        result: result as any, score: result.score, weight,
       });
     };
 
