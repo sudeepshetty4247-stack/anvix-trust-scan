@@ -17,14 +17,41 @@ const DIVIDER = rgb(0.85, 0.86, 0.88);
 
 type Ctx = { doc: PDFDocument; page: PDFPage; y: number; font: PDFFont; bold: PDFFont };
 
+// pdf-lib's Helvetica uses WinAnsi encoding which can't render many Unicode
+// glyphs (arrows, checkmarks, box-drawing, rupee, etc.). Replace common ones
+// with ASCII fallbacks and strip anything else outside WinAnsi's range.
+function san(s: unknown): string {
+  const t = String(s ?? "");
+  return t
+    .replace(/[\u2192\u21D2]/g, "->")
+    .replace(/[\u2190\u21D0]/g, "<-")
+    .replace(/[\u2713\u2714]/g, "OK")
+    .replace(/[\u2717\u2718\u2715\u274C]/g, "X")
+    .replace(/[\u2022\u25CF\u25AA\u25A0]/g, "-")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[\u2018\u2019\u201A]/g, "'")
+    .replace(/[\u201C\u201D\u201E]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u00B7/g, "·")
+    .replace(/\u20B9/g, "Rs.")
+    .replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "?");
+}
+function patchPage(page: PDFPage): PDFPage {
+  const orig = page.drawText.bind(page);
+  (page as unknown as { drawText: (t: string, o: unknown) => void }).drawText = (t, o) =>
+    orig(san(t), o as Parameters<typeof orig>[1]);
+  return page;
+}
+
 function newPage(ctx: Ctx) {
-  ctx.page = ctx.doc.addPage([PAGE_W, PAGE_H]);
+  ctx.page = patchPage(ctx.doc.addPage([PAGE_W, PAGE_H]));
   ctx.y = PAGE_H - M;
   header(ctx);
 }
 function ensure(ctx: Ctx, needed: number) {
   if (ctx.y - needed < M + 30) newPage(ctx);
 }
+
 function header(ctx: Ctx) {
   ctx.page.drawText("ANVIX", { x: M, y: PAGE_H - 30, size: 12, font: ctx.bold, color: PRIMARY });
   ctx.page.drawText("Recruitment Trust & Fraud Report", {
