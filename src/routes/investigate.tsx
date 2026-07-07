@@ -832,6 +832,29 @@ function ReportView({
   const r = record.result;
   const meta = RISK_META[r.risk_category];
   const n = record.narrative;
+  const [firOpen, setFirOpen] = useState(false);
+  const [trapOpen, setTrapOpen] = useState(false);
+  const [techOpen, setTechOpen] = useState(false);
+  const isHighRisk = r.risk_category === "fraudulent" || r.risk_category === "high_risk";
+
+  // Extract identifiers from evidence for the FIR pre-fill.
+  const extractedIdentifiers = {
+    emails: Array.from(new Set(record.input.evidence.flatMap((e) => e.emails ?? []))).slice(0, 10),
+    phones: Array.from(new Set(record.input.evidence.flatMap((e) => e.phones ?? []))).slice(0, 10),
+    upi_or_bank: Array.from(
+      new Set(record.input.evidence.flatMap((e) => e.payment_methods ?? [])),
+    ).slice(0, 10),
+    websites: Array.from(
+      new Set([...(record.input.urls ?? []), ...record.input.evidence.flatMap((e) => e.urls ?? [])]),
+    ).slice(0, 10),
+    names: Array.from(new Set(record.input.evidence.flatMap((e) => e.people ?? []))).slice(0, 10),
+  };
+  const firEvidence = record.input.evidence.map((e) => ({
+    label: e.filename || null,
+    content: e.extracted_text || null,
+    kind: e.kind,
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
