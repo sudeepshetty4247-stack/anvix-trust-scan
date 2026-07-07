@@ -135,7 +135,12 @@ export const listRecentPublicReports = createServerFn({ method: "GET" }).handler
       .select("slug, verdict, trust_score, case_name, created_at")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(6);
-    return data ?? [];
+      .limit(24);
+    // Hide placeholder/empty runs — only surface real named cases.
+    const cleaned = (data ?? []).filter((r) => {
+      const name = (r.case_name ?? "").trim().toLowerCase();
+      return name.length > 0 && name !== "untitled investigation" && name !== "untitled";
+    });
+    return cleaned.slice(0, 6);
   },
 );
