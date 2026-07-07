@@ -1,7 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck, LayoutDashboard, LogOut, Plus } from "lucide-react";
+import { ShieldCheck, LayoutDashboard, LogOut, Plus, Home } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function AppShell({
@@ -25,14 +25,17 @@ export function AppShell({
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border/70 bg-surface/40 backdrop-blur md:flex">
-        <div className="flex items-center gap-2 px-5 py-5">
+        <Link to="/" className="flex items-center gap-2 px-5 py-5 hover:opacity-80">
           <div className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 ring-1 ring-primary/30">
             <ShieldCheck className="h-4 w-4 text-primary" />
           </div>
           <span className="text-sm font-semibold tracking-tight">ANVIX</span>
-        </div>
+        </Link>
 
         <nav className="flex-1 space-y-1 px-3">
+          <NavItem to="/" active={false} icon={<Home className="h-4 w-4" />}>
+            Home
+          </NavItem>
           <NavItem
             to="/dashboard"
             active={pathname === "/dashboard"}
@@ -60,7 +63,32 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 min-w-0">
+        {/* Mobile top bar */}
+        <div className="flex items-center justify-between border-b border-border/60 bg-surface/40 px-4 py-3 backdrop-blur md:hidden">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="grid h-7 w-7 place-items-center rounded-md bg-primary/15 ring-1 ring-primary/30">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+            </div>
+            <span className="text-sm font-semibold tracking-tight">ANVIX</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs hover:bg-accent"
+            >
+              <Home className="h-3.5 w-3.5" /> Home
+            </Link>
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs hover:bg-accent"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
+            </Link>
+          </div>
+        </div>
+        {children}
+      </main>
     </div>
   );
 }
