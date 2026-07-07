@@ -11,6 +11,8 @@ import {
   checkWebsite,
   checkWhois,
   extractDomain,
+  extractEmails,
+  extractUrls,
   isFreeEmail,
   suspiciousTld,
   type CheckResult,
@@ -133,16 +135,18 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
     // Aggregate all inputs — free-typed and extracted-from-evidence
+    const textUrls = extractUrls(data.text);
+    const textEmails = extractEmails(data.text);
     const aggregatedUrls = Array.from(
       new Set(
-        [...data.urls, ...data.evidence.flatMap((e) => e.urls)]
+        [...data.urls, ...textUrls, ...data.evidence.flatMap((e) => e.urls)]
           .map((u) => u.trim())
           .filter(Boolean),
       ),
     );
     const aggregatedEmails = Array.from(
       new Set(
-        [...data.emails, ...data.evidence.flatMap((e) => e.emails)]
+        [...data.emails, ...textEmails, ...data.evidence.flatMap((e) => e.emails)]
           .map((e) => e.trim().toLowerCase())
           .filter(Boolean),
       ),
@@ -358,10 +362,10 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       dmarc,
       official_email_match: officialMatch,
       website_reachable: web,
-      fraud_keywords: 1 - tx.fraud.score,
-      payment_request: tx.payment.status === "fail" || suspiciousPayments.length > 0 ? 0 : 1,
-      crypto_mention: 1 - tx.crypto.score,
-      urgency_score: 1 - tx.urgency.score,
+      fraud_keywords: tx.fraud.score,
+      payment_request: tx.payment.status === "fail" || suspiciousPayments.length > 0 ? 1 : 0,
+      crypto_mention: tx.crypto.score,
+      urgency_score: tx.urgency.score,
       grammar_quality: tx.grammar.score,
       evidence_count: Math.min(
         1,
@@ -387,10 +391,10 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     };
     const weighted = scoreFeatures(wf);
 
-    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (60%) with weighted baseline (30%),
+    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (60%) with weighted baseline (40%),
     //    then apply community-intelligence + live-verification penalties (up to -25).
     const trust_from_ml = Math.round((1 - ens.ensemble) * 100);
-    const base_trust = Math.round(trust_from_ml * 0.6 + weighted.score * 0.3);
+    const base_trust = Math.round(trust_from_ml * 0.6 + weighted.score * 0.4);
     const communityPenalty = communitySignals.reduce((acc, s) => {
       const w = s.severity === "critical" ? 12 : s.severity === "high" ? 8 : s.severity === "warning" ? 4 : 2;
       return acc + Math.min(w, w * Math.log2(1 + s.report_count) / 2);
@@ -400,8 +404,9 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     // the model has nothing to trust — hard-cap the score so it can't
     // accidentally read as "safe". Real scams often arrive as a single
     // sentence with no proof, and those must NOT score in the 40s+.
-    const noEvidencePenalty =
-      data.evidence.length === 0 || aggregatedText.trim().length < 40 ? 40 : 0;
+    const hasActionableEvidence =
+      aggregatedUrls.length > 0 || aggregatedEmails.length > 0 || aggregatedText.trim().length >= 40;
+    const noEvidencePenalty = hasActionableEvidence ? 0 : 40;
     const trust = Math.max(
       0,
       Math.min(100, Math.round(base_trust - communityPenalty - livePenalty - noEvidencePenalty)),
@@ -487,7 +492,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       trust_score: trust,
       risk_category: category,
       confidence: weighted.confidence,
-      model_used: `ANVIX-Blend-v3 (Ensemble 60% + Weighted 30% \u2212 Community/Live penalties)`,
+      model_used: `ANVIX-Blend-v3 (Ensemble 60% + Weighted 40% \u2212 Community/Live penalties)`,
       fraud_probability: Math.round(ens.ensemble * 10000) / 10000,
       ensemble_breakdown: {
         lr: Math.round(ens.lr * 10000) / 10000,
