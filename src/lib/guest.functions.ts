@@ -290,7 +290,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       })(),
       url_count_norm: Math.min(aggregatedUrls.length, 5) / 5,
     };
-    const pFraud = predictFraudProbability(kf);
+    // (predictFraudProbability is exported for tests / report — Ensemble covers scoring below.)
     const ens = predictEnsemble(kf);
     const kaggleContribs = featureContributions(kf);
 
