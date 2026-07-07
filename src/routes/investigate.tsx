@@ -21,6 +21,8 @@ import {
 } from "@/lib/guest-storage";
 import { generateReportPDF, downloadPDF } from "@/lib/report-pdf";
 import { RISK_META } from "@/lib/scoring";
+import { createPublicReport } from "@/lib/share.functions";
+import { ShareCompletionCard } from "@/components/ShareCompletionCard";
 import {
   ShieldCheck,
   ArrowLeft,
