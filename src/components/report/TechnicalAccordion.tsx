@@ -117,7 +117,7 @@ export function TechnicalAccordion({
                   }
                 />
               </div>
-              {prediction.feature_importance && typeof prediction.feature_importance === "object" && (
+              {!!prediction.feature_importance && typeof prediction.feature_importance === "object" && (
                 <div className="mt-3 rounded-lg border border-border/60 p-3">
                   <div className="mono mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
                     Top feature importance
