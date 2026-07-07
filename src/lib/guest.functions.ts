@@ -25,8 +25,7 @@ export type GuestVerification = {
   score: number | null;
   detail: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
-  data?: unknown;
+  data?: any;
 };
 
 export type GuestResult = {
