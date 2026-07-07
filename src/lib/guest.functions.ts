@@ -388,7 +388,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
             ? "High risk. Do not send ID, bank details, or payments. Independently verify via the company's public HR contact."
             : "Likely fraud. Cease contact, do not send documents or money, and report to the platform where you found it.";
 
-    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-LR-v1 model (trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) and a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_", " ")}). The Kaggle model estimated fraud probability at ${(pFraud * 100).toFixed(1)}% across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${aggregatedEmails.length} email(s).`;
+    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-Ensemble-v2 model (Logistic Regression + Gradient Boosting, trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) plus a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_", " ")}). Ensemble P(fraud) = ${(ens.ensemble * 100).toFixed(1)}% (LR ${(ens.lr * 100).toFixed(1)}%, GBM ${(ens.gbm * 100).toFixed(1)}%) across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${aggregatedEmails.length} email(s).`;
 
     const verifications_summary =
       verifications
