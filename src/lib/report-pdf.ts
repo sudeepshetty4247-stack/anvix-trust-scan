@@ -160,13 +160,10 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     font: bold,
     color: TEXT,
   });
-  ctx.page.drawText(`ML fraud probability: ${(r.fraud_probability * 100).toFixed(1)}%`, {
-    x: M + 140,
-    y: ctx.y - 26,
-    size: 9,
-    font,
-    color: MUTED,
-  });
+  ctx.page.drawText(
+    `Ensemble P(fraud): ${(r.ensemble_breakdown.ensemble * 100).toFixed(1)}%  (LR ${(r.ensemble_breakdown.lr * 100).toFixed(0)}% · GBM ${(r.ensemble_breakdown.gbm * 100).toFixed(0)}%)`,
+    { x: M + 140, y: ctx.y - 26, size: 9, font, color: MUTED },
+  );
   ctx.page.drawText(
     `Weighted baseline: ${r.weighted_score}/100  ·  Confidence: ${(r.confidence * 100).toFixed(0)}%`,
     { x: M + 140, y: ctx.y - 40, size: 9, font, color: MUTED },

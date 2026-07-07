@@ -1,16 +1,23 @@
-// ANVIX Kaggle-trained Logistic Regression scorer.
-// Coefficients were trained offline in /ml/train.py on the EMSCAD / Kaggle
-// "Real / Fake Job Postings" dataset (17,880 rows, 866 fraud-labeled).
-// Model comparison (test set, stratified 20% holdout):
-//   LogisticRegression: accuracy 0.83, precision 0.17, recall 0.62, F1 0.26, ROC-AUC 0.76
-//   RandomForest:       accuracy 0.95, precision 0.47, recall 0.50, F1 0.49, ROC-AUC 0.87
-//   GradientBoosting:   accuracy 0.96, precision 0.90, recall 0.25, F1 0.40, ROC-AUC 0.84
-// LR is deployed at the edge because it is a pure numeric function of the
-// feature vector — no Python runtime, no model file loading at request time,
-// no data leaves the worker. RF/GB metrics are reported for comparison in
-// the trust report and the project report (chapter 7).
+// ANVIX Kaggle-trained ensemble scorer.
+// Coefficients + forest were trained in /ml/train_ensemble.py on the
+// EMSCAD / Kaggle "Real or Fake Fake Job Postings" dataset
+// (17,880 rows, 866 fraud-labeled).
+//
+// Ensemble = logit-average of Logistic Regression (edge-native, 21 features)
+// and a 120-tree Gradient Boosting forest (max_depth=3), both trained on
+// the same feature vector. RF is reported for comparison only.
+//
+// Test-set metrics (see ml/metrics.json, updated by every training run):
+//   LogisticRegression: acc 0.82, prec 0.16, recall 0.62, F1 0.25, ROC-AUC 0.77
+//   RandomForest:       acc 0.92, prec 0.32, recall 0.64, F1 0.42, ROC-AUC 0.91
+//   GradientBoosting:   acc 0.96, prec 0.78, recall 0.35, F1 0.49, ROC-AUC 0.88
+//   Ensemble(LR+GBM):   acc 0.96, prec 0.66, recall 0.35, F1 0.45, ROC-AUC 0.87
+//
+// Both models run entirely at the edge — no Python runtime, no model file
+// loaded at request time, no evidence leaves the worker.
 
 import coefsJson from "../../ml/model_coefficients.json";
+import forestJson from "../../ml/forest_model.json";
 
 export const KAGGLE_MODEL = coefsJson as {
   model: string;
@@ -21,6 +28,12 @@ export const KAGGLE_MODEL = coefsJson as {
   coefficients: number[];
   intercept: number;
   best_model_name: string;
+  ensemble: {
+    lr_weight: number;
+    gbm_weight: number;
+    threshold: number;
+    gbm_threshold: number;
+  };
   metrics: Record<
     string,
     {
@@ -32,6 +45,19 @@ export const KAGGLE_MODEL = coefsJson as {
       confusion: number[][];
     }
   >;
+};
+
+type ForestNode =
+  | { leaf: number }
+  | { feat: number; thr: number; l: number; r: number };
+
+const FOREST = forestJson as {
+  kind: "sklearn-gbm";
+  n_features: number;
+  feature_names: string[];
+  learning_rate: number;
+  init_log_odds: number;
+  trees: ForestNode[][];
 };
 
 export type KaggleFeatures = {
@@ -52,28 +78,74 @@ export type KaggleFeatures = {
   has_benefits: number;
   desc_len_norm: number;
   employment_specified: number;
+  // v2 additions:
+  salary_missing: number;
+  location_missing: number;
+  title_shouty: number;
+  url_count_norm: number;
 };
 
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
+const clip = (p: number) => Math.max(1e-6, Math.min(1 - 1e-6, p));
+const logit = (p: number) => Math.log(clip(p) / (1 - clip(p)));
 
-/** Returns P(fraud) in [0,1]. */
+function toVector(f: KaggleFeatures, names: string[]): number[] {
+  return names.map((n) => (f as unknown as Record<string, number>)[n] ?? 0);
+}
+
+/** Logistic Regression P(fraud) in [0,1]. */
 export function predictFraudProbability(f: KaggleFeatures): number {
   let z = KAGGLE_MODEL.intercept;
   const c = KAGGLE_MODEL.coefficients;
-  const names = KAGGLE_MODEL.feature_names as (keyof KaggleFeatures)[];
-  for (let i = 0; i < names.length; i++) {
-    z += c[i] * (f[names[i]] ?? 0);
-  }
+  const names = KAGGLE_MODEL.feature_names;
+  const v = toVector(f, names);
+  for (let i = 0; i < names.length; i++) z += c[i] * v[i];
   return sigmoid(z);
 }
 
-/** Contribution of each feature to the log-odds (for explainability). */
+/** Gradient Boosting P(fraud) using the exported forest. */
+export function predictForestProbability(f: KaggleFeatures): number {
+  const v = toVector(f, FOREST.feature_names);
+  let score = FOREST.init_log_odds;
+  for (const tree of FOREST.trees) {
+    let i = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const node = tree[i];
+      if ("leaf" in node) {
+        score += FOREST.learning_rate * node.leaf;
+        break;
+      }
+      i = v[node.feat] <= node.thr ? node.l : node.r;
+    }
+  }
+  return sigmoid(score);
+}
+
+/**
+ * Ensemble P(fraud): logit-average of LR + GBM, weighted by the training-time
+ * blend that maximised F1. Also returns the per-model probabilities so the
+ * trust report can show the breakdown.
+ */
+export function predictEnsemble(f: KaggleFeatures): {
+  ensemble: number;
+  lr: number;
+  gbm: number;
+  threshold: number;
+} {
+  const lr = predictFraudProbability(f);
+  const gbm = predictForestProbability(f);
+  const { lr_weight, gbm_weight, threshold } = KAGGLE_MODEL.ensemble;
+  const z = lr_weight * logit(lr) + gbm_weight * logit(gbm);
+  return { ensemble: sigmoid(z), lr, gbm, threshold };
+}
+
+/** Contribution of each feature to the LR log-odds (for explainability). */
 export function featureContributions(f: KaggleFeatures): Record<string, number> {
   const out: Record<string, number> = {};
   const c = KAGGLE_MODEL.coefficients;
-  const names = KAGGLE_MODEL.feature_names as (keyof KaggleFeatures)[];
-  for (let i = 0; i < names.length; i++) {
-    out[names[i]] = c[i] * (f[names[i]] ?? 0);
-  }
+  const names = KAGGLE_MODEL.feature_names;
+  const v = toVector(f, names);
+  for (let i = 0; i < names.length; i++) out[names[i]] = c[i] * v[i];
   return out;
 }

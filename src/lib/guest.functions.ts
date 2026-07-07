@@ -17,6 +17,7 @@ import {
 } from "./verification.server";
 import {
   predictFraudProbability,
+  predictEnsemble,
   featureContributions,
   KAGGLE_MODEL,
   type KaggleFeatures,
@@ -62,6 +63,7 @@ export type GuestResult = {
   confidence: number;
   model_used: string;
   fraud_probability: number;
+  ensemble_breakdown: { lr: number; gbm: number; ensemble: number; threshold: number };
   kaggle_features: KaggleFeatures;
   kaggle_contributions: Record<string, number>;
   weighted_features: Record<string, number>;
@@ -280,8 +282,17 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       employment_specified: /full.?time|part.?time|contract|internship|freelance/i.test(corpus)
         ? 1
         : 0,
+      salary_missing: /\b(salary|compensation|pay|ctc|package|per\s*(year|month|annum))\b/i.test(corpus) ? 0 : 1,
+      location_missing: /\b(remote|onsite|hybrid|bengaluru|bangalore|mumbai|delhi|chennai|london|new\s*york|san\s*francisco|city|address|location)\b/i.test(corpus) ? 0 : 1,
+      title_shouty: (() => {
+        const name = data.name ?? "";
+        const upper = [...name].filter((c) => c >= "A" && c <= "Z").length;
+        return name.length > 4 && upper / name.length > 0.6 ? 1 : 0;
+      })(),
+      url_count_norm: Math.min(aggregatedUrls.length, 5) / 5,
     };
-    const pFraud = predictFraudProbability(kf);
+    // (predictFraudProbability is exported for tests / report — Ensemble covers scoring below.)
+    const ens = predictEnsemble(kf);
     const kaggleContribs = featureContributions(kf);
 
     // -- Weighted-baseline for comparison + explainability --
@@ -322,9 +333,9 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     };
     const weighted = scoreFeatures(wf);
 
-    // -- Final score: blend Kaggle-LR probability (60%) with weighted baseline (40%) --
-    const trust_from_lr = Math.round((1 - pFraud) * 100);
-    const trust = Math.round(trust_from_lr * 0.6 + weighted.score * 0.4);
+    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (65%) with weighted baseline (35%) --
+    const trust_from_ml = Math.round((1 - ens.ensemble) * 100);
+    const trust = Math.round(trust_from_ml * 0.65 + weighted.score * 0.35);
     const category: RiskCategory =
       trust >= 85
         ? "trusted"
@@ -378,7 +389,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
             ? "High risk. Do not send ID, bank details, or payments. Independently verify via the company's public HR contact."
             : "Likely fraud. Cease contact, do not send documents or money, and report to the platform where you found it.";
 
-    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-LR-v1 model (trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) and a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_", " ")}). The Kaggle model estimated fraud probability at ${(pFraud * 100).toFixed(1)}% across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${aggregatedEmails.length} email(s).`;
+    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-Ensemble-v2 model (Logistic Regression + Gradient Boosting, trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) plus a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_", " ")}). Ensemble P(fraud) = ${(ens.ensemble * 100).toFixed(1)}% (LR ${(ens.lr * 100).toFixed(1)}%, GBM ${(ens.gbm * 100).toFixed(1)}%) across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${aggregatedEmails.length} email(s).`;
 
     const verifications_summary =
       verifications
@@ -391,8 +402,14 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       trust_score: trust,
       risk_category: category,
       confidence: weighted.confidence,
-      model_used: `ANVIX-Blend-v1 (Kaggle-LR 60% + Weighted-Baseline 40%)`,
-      fraud_probability: Math.round(pFraud * 10000) / 10000,
+      model_used: `ANVIX-Blend-v2 (Kaggle-Ensemble LR+GBM 65% + Weighted-Baseline 35%)`,
+      fraud_probability: Math.round(ens.ensemble * 10000) / 10000,
+      ensemble_breakdown: {
+        lr: Math.round(ens.lr * 10000) / 10000,
+        gbm: Math.round(ens.gbm * 10000) / 10000,
+        ensemble: Math.round(ens.ensemble * 10000) / 10000,
+        threshold: ens.threshold,
+      },
       kaggle_features: kf,
       kaggle_contributions: Object.fromEntries(
         Object.entries(kaggleContribs).map(([k, v]) => [k, Math.round(v * 1000) / 1000]),

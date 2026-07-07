@@ -1,35 +1,70 @@
 {
   "LogisticRegression": {
-    "accuracy": 0.83,
-    "precision": 0.1659,
+    "accuracy": 0.8174,
+    "precision": 0.1552,
     "recall": 0.6243,
-    "f1": 0.2621,
-    "roc_auc": 0.7574,
+    "f1": 0.2486,
+    "roc_auc": 0.7717,
     "confusion": [
-      [2860, 543],
-      [65, 108]
+      [
+        2815,
+        588
+      ],
+      [
+        65,
+        108
+      ]
     ]
   },
   "RandomForest": {
-    "accuracy": 0.9485,
-    "precision": 0.4703,
-    "recall": 0.5029,
-    "f1": 0.486,
-    "roc_auc": 0.8719,
+    "accuracy": 0.9155,
+    "precision": 0.3152,
+    "recall": 0.6358,
+    "f1": 0.4215,
+    "roc_auc": 0.9071,
     "confusion": [
-      [3305, 98],
-      [86, 87]
+      [
+        3164,
+        239
+      ],
+      [
+        63,
+        110
+      ]
     ]
   },
   "GradientBoosting": {
-    "accuracy": 0.9625,
-    "precision": 0.898,
-    "recall": 0.2543,
-    "f1": 0.3964,
-    "roc_auc": 0.84,
+    "accuracy": 0.9639,
+    "precision": 0.7821,
+    "recall": 0.3526,
+    "f1": 0.4861,
+    "roc_auc": 0.8763,
     "confusion": [
-      [3398, 5],
-      [129, 44]
+      [
+        3386,
+        17
+      ],
+      [
+        112,
+        61
+      ]
+    ]
+  },
+  "Ensemble": {
+    "accuracy": 0.9597,
+    "precision": 0.6593,
+    "recall": 0.3468,
+    "f1": 0.4545,
+    "roc_auc": 0.8672,
+    "confusion": [
+      [
+        3372,
+        31
+      ],
+      [
+        113,
+        60
+      ]
     ]
   }
 }
