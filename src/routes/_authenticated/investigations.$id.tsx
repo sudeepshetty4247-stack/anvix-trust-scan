@@ -1,5 +1,5 @@
 import { createFileRoute, useParams, Link } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
@@ -18,6 +18,8 @@ import { InvestigationTimeline } from "@/components/report/InvestigationTimeline
 import { ChecksSummary } from "@/components/report/ChecksSummary";
 import { PlainEnglishExplainer } from "@/components/report/PlainEnglishExplainer";
 import { TechnicalAccordion } from "@/components/report/TechnicalAccordion";
+import { GenerateFIRDialog } from "@/components/GenerateFIRDialog";
+import { TrapReplyDialog } from "@/components/TrapReplyDialog";
 import {
   Play,
   ArrowLeft,
@@ -26,6 +28,8 @@ import {
   Image as ImageIcon,
   Loader2,
   Download,
+  FileWarning,
+  MessagesSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
