@@ -137,7 +137,7 @@ export const reportPaymentIdentifier = createServerFn({ method: "POST" })
       payment_handles: kind === "upi" || kind === "bank_account" ? [value] : [],
       offer_patterns: [],
       severity: "high",
-      sample_context: contextLine || undefined,
+      sample_context: contextLine || "",
     });
     return { ok: true, ...result };
   });
