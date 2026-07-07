@@ -3,6 +3,7 @@
 // (see /investigate download flow).
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import QRCode from "qrcode";
 import type { GuestRecord } from "./guest-storage";
 
 const M = 48; // page margin
