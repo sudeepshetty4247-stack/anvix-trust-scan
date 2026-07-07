@@ -298,6 +298,50 @@ function InvestigationDetail() {
           </section>
         )}
 
+        {/* Rescue Kit: FIR + Trap-reply actions (only for high-risk cases) */}
+        {completed && isHighRisk && (
+          <section className="glass mt-6 rounded-2xl border border-destructive/30 p-5 sm:p-6">
+            <div className="mono text-[11px] uppercase tracking-[0.22em] text-destructive">
+              ANVIX Rescue Kit
+            </div>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">
+              Take the next step — fast
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              If money was lost, file a cybercrime complaint within 24 hours. If the scammer
+              is still messaging you, extract more evidence with a safe reply.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setFirOpen(true)}
+                className="group flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10"
+              >
+                <FileWarning className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div>
+                  <div className="text-sm font-semibold">Generate cybercrime complaint</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    Pre-filled PDF ready to attach at cybercrime.gov.in
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTrapOpen(true)}
+                className="group flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 text-left hover:bg-primary/10"
+              >
+                <MessagesSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <div className="text-sm font-semibold">Generate a safe reply</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    3 messages that extract more evidence without spooking them
+                  </div>
+                </div>
+              </button>
+            </div>
+          </section>
+        )}
+
         {/* Final recommendation footer */}
         {completed && verdict && (
           <div
@@ -314,8 +358,59 @@ function InvestigationDetail() {
           </div>
         )}
       </div>
+
+      {/* Dialogs */}
+      <GenerateFIRDialog
+        open={firOpen}
+        onClose={() => setFirOpen(false)}
+        caseName={inv.name}
+        caseSummary={report?.summary || `Investigation: ${inv.name}`}
+        evidence={evidence}
+        extractedIdentifiers={extractedIdentifiers}
+      />
+      <TrapReplyDialog
+        open={trapOpen}
+        onClose={() => setTrapOpen(false)}
+        caseName={inv.name}
+        caseSummary={report?.summary || `Investigation: ${inv.name}`}
+      />
     </AppShell>
   );
+}
+
+// Pull emails, phones, UPI/bank accounts, and websites out of the raw
+// evidence rows so we can pre-fill the cybercrime complaint.
+type EvidenceRow = {
+  content?: string | null;
+  label?: string | null;
+  extracted_text?: string | null;
+};
+function extractIdentifiersFromEvidence(evidence: EvidenceRow[]) {
+  const emails = new Set<string>();
+  const phones = new Set<string>();
+  const upiOrBank = new Set<string>();
+  const websites = new Set<string>();
+  const emailRe = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+  const upiRe = /\b[a-z0-9._-]+@(?:ok(?:axis|hdfc|icici|sbi)|paytm|ybl|ibl|axl|apl|upi)\b/gi;
+  const phoneRe = /\+?\d[\d\s-]{8,15}\d/g;
+  const urlRe = /\bhttps?:\/\/[^\s"<>)]+/gi;
+  for (const e of evidence) {
+    const blob = `${e.content ?? ""}\n${e.label ?? ""}\n${e.extracted_text ?? ""}`;
+    for (const m of blob.match(emailRe) ?? []) emails.add(m.toLowerCase());
+    for (const m of blob.match(upiRe) ?? []) upiOrBank.add(m.toLowerCase());
+    for (const m of blob.match(phoneRe) ?? []) {
+      const digits = m.replace(/[\s-]/g, "");
+      if (digits.replace(/^\+/, "").length >= 10) phones.add(digits);
+    }
+    for (const m of blob.match(urlRe) ?? []) websites.add(m);
+  }
+  return {
+    emails: Array.from(emails).slice(0, 10),
+    phones: Array.from(phones).slice(0, 10),
+    upi_or_bank: Array.from(upiOrBank).slice(0, 10),
+    websites: Array.from(websites).slice(0, 10),
+    names: [] as string[],
+  };
 }
 
 function EvidenceIcon({ kind }: { kind: string }) {
