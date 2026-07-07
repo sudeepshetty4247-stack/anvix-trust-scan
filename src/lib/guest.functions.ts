@@ -301,16 +301,25 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       ),
     ]);
 
-    if (communitySignals.length > 0) {
-      const worst = communitySignals.reduce(
+    const hasConcreteScamSignal =
+      tx.fraud.status === "fail" ||
+      tx.payment.status === "fail" ||
+      suspiciousPayments.length > 0 ||
+      tx.crypto.status === "fail" ||
+      anySusTld ||
+      freeEmailCount > 0;
+    const effectiveCommunitySignals = hasConcreteScamSignal ? communitySignals : [];
+
+    if (effectiveCommunitySignals.length > 0) {
+      const worst = effectiveCommunitySignals.reduce(
         (a, b) => (b.report_count > a.report_count ? b : a),
-        communitySignals[0],
+        effectiveCommunitySignals[0],
       );
       push("community", "Previously reported by other users", {
         status: worst.severity === "info" ? "warning" : "fail",
         score: 1,
-        detail: `${communitySignals.length} identifier(s) matched the global scam-signals database (top: ${worst.matched_preview}, reported ${worst.report_count} time(s), first seen ${new Date(worst.first_seen).toISOString().slice(0, 10)}).`,
-        data: communitySignals,
+        detail: `${effectiveCommunitySignals.length} identifier(s) matched the global scam-signals database (top: ${worst.matched_preview}, reported ${worst.report_count} time(s), first seen ${new Date(worst.first_seen).toISOString().slice(0, 10)}).`,
+        data: effectiveCommunitySignals,
       });
     }
 
@@ -395,7 +404,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     //    then apply community-intelligence + live-verification penalties (up to -25).
     const trust_from_ml = Math.round((1 - ens.ensemble) * 100);
     const base_trust = Math.round(trust_from_ml * 0.6 + weighted.score * 0.4);
-    const communityPenalty = communitySignals.reduce((acc, s) => {
+    const communityPenalty = effectiveCommunitySignals.reduce((acc, s) => {
       const w = s.severity === "critical" ? 12 : s.severity === "high" ? 8 : s.severity === "warning" ? 4 : 2;
       return acc + Math.min(w, w * Math.log2(1 + s.report_count) / 2);
     }, 0);
@@ -434,7 +443,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
         screenshot: data.evidence.some((e) => /image|screenshot|png|jpg/i.test(e.kind)),
         text: aggregatedText.length > 100,
       },
-      community_hits: communitySignals.length,
+      community_hits: effectiveCommunitySignals.length,
     });
 
     // -- Explainability text --
@@ -518,7 +527,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       missing_evidence: missing,
       recommendation,
       verifications_summary,
-      community_signals: communitySignals,
+      community_signals: effectiveCommunitySignals,
       live_verification: liveVerification,
       confidence_band,
       model_metadata: {
