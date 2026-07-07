@@ -1,9 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2, Home } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -62,11 +62,19 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen place-items-center px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 ring-1 ring-primary/30">
-            <ShieldCheck className="h-4 w-4 text-primary" />
+        <div className="mb-8 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary/15 ring-1 ring-primary/30">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+            </div>
+            <span className="truncate text-lg font-semibold tracking-tight">ANVIX</span>
           </div>
-          <span className="text-lg font-semibold tracking-tight">ANVIX</span>
+          <Link
+            to="/"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-accent"
+          >
+            <Home className="h-3.5 w-3.5" /> Home
+          </Link>
         </div>
 
         <h1 className="text-2xl font-semibold tracking-tight">
