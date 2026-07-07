@@ -1,102 +1,206 @@
-# Run Anvix Locally — Honest Guide
+# ANVIX — Complete Local Setup Guide
 
-This project runs on **Lovable Cloud** (database, auth, storage) + **Lovable AI Gateway** (the AI explanation feature). Two of those keys (`LOVABLE_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) only exist inside Lovable and cannot be exported. So there is no "clone and run with 100% features and zero signup" path. Pick one of the three options below.
-
----
-
-## Option 1 — Just use the live URL (recommended for college demo)
-
-Nothing to install. Everything works.
-
-- Live app: **https://anvix-trust-scan.lovable.app**
-- Full AI, full database, full extension backend — already live.
-- For your submission: share this URL + your GitHub repo link + a screen recording.
-
-**This is what most Lovable college projects do.** No local setup risk on demo day.
+Zero-assumption, step-by-step instructions to clone ANVIX and run it on your own laptop (Windows / macOS / Linux). If a fresh laptop follows this doc top-to-bottom, ANVIX will be running at `http://localhost:3000` in under 10 minutes.
 
 ---
 
-## Option 2 — Run locally (AI features off, everything else works)
+## 1. Prerequisites — install these first
 
-No third-party signup needed. You lose only the AI-generated explanation paragraph and evidence auto-extraction from screenshots/PDFs. Landing page, sign-in, dashboard, scans, database, extension — all work.
+| Tool | Why | Check it works |
+|---|---|---|
+| **Node.js 20+ (LTS)** | JavaScript runtime | `node -v` |
+| **Bun** (recommended) | Fast package manager the project uses | `bun -v` |
+| **Git** | To clone the repo | `git -v` |
+| **VS Code** (optional) | Editor | — |
+| A modern browser | To open the app | — |
 
-### Steps
+**Install Node.js:** https://nodejs.org/en/download (pick the LTS installer).
 
-**1. Install once**
-- Node.js 20+ → https://nodejs.org
-- Bun → https://bun.sh
-  - macOS/Linux: `curl -fsSL https://bun.sh/install | bash`
-  - Windows: `powershell -c "irm bun.sh/install.ps1 | iex"`
-- Git → https://git-scm.com
+**Install Bun:**
+- macOS / Linux:
+  ```bash
+  curl -fsSL https://bun.sh/install | bash
+  ```
+- Windows (PowerShell):
+  ```powershell
+  powershell -c "irm bun.sh/install.ps1 | iex"
+  ```
+- Restart your terminal after installing, then verify with `bun -v`.
 
-**2. Get the code from GitHub**
+**Install Git:** https://git-scm.com/downloads
+
+> If you don't want to install Bun, `npm` (bundled with Node.js) works too — just swap `bun` for `npm run` in every command.
+
+---
+
+## 2. Get the code
+
+**Option A — clone from GitHub** (recommended; requires the project connected to GitHub in the Lovable editor first):
+
 ```bash
-git clone https://github.com/sudeepshetty4247-stack/anvix-lovable.git
-cd anvix-lovable
+git clone <your-repo-url>
+cd anvix-trust-scan
+```
+
+To connect the project to GitHub: in the Lovable editor, click the **+** menu (bottom-left of the chat) → **GitHub** → **Connect project** → authorize → **Create Repository**. Then copy the repo URL.
+
+**Option B — download a ZIP** from the Lovable code editor:
+1. Open the Lovable code editor
+2. Click **Download codebase** at the bottom of the file tree
+3. Unzip, then `cd` into the folder
+
+---
+
+## 3. Install dependencies
+
+```bash
+bun install
+# or, if you're using npm:
+npm install
+```
+
+Expected time: 30–90 seconds.
+
+**If install fails:**
+```bash
+rm -rf node_modules bun.lockb   # or "del /s /q node_modules" on Windows
 bun install
 ```
 
-**3. Create `.env` in the project root**
-```env
-VITE_SUPABASE_URL=https://tycnbtycdjgwjmjfdwtm.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj
-VITE_SUPABASE_PROJECT_ID=tycnbtycdjgwjmjfdwtm
+---
 
-SUPABASE_URL=https://tycnbtycdjgwjmjfdwtm.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj
-SUPABASE_PROJECT_ID=tycnbtycdjgwjmjfdwtm
+## 4. Create your `.env` file
 
-ANVIX_SIGNAL_PEPPER=change-me-to-any-random-string-123
-```
+Create a file named `.env` in the project root and paste this block:
 
-**4. Run**
 ```bash
-bun run dev
-```
-Open **http://localhost:8080**.
+# --- Client-side (safe to commit — publishable keys only) ---
+VITE_SUPABASE_URL="https://tycnbtycdjgwjmjfdwtm.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj"
+VITE_SUPABASE_PROJECT_ID="tycnbtycdjgwjmjfdwtm"
 
-Your local app talks to the same Lovable Cloud database as the live site.
+# --- Server-side (same values, needed by server functions) ---
+SUPABASE_URL="https://tycnbtycdjgwjmjfdwtm.supabase.co"
+SUPABASE_PUBLISHABLE_KEY="sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj"
+SUPABASE_PROJECT_ID="tycnbtycdjgwjmjfdwtm"
 
----
-
-## Option 3 — Run locally with full AI (2-minute free signup)
-
-Same as Option 2, plus a free Google Gemini key so AI works.
-
-**Extra steps after Option 2:**
-
-**a.** Go to **https://aistudio.google.com/apikey** → sign in with Google → **Create API key**. No credit card. Copy the key.
-
-**b.** Add it to `.env`:
-```env
-GEMINI_API_KEY=<your Gemini key>
+# --- Server-only secrets (optional — see table below) ---
+LOVABLE_API_KEY=""             # required for AI features
+ANVIX_SIGNAL_PEPPER=""         # any random 32+ char string
+# SUPABASE_SERVICE_ROLE_KEY=""  # not available on Lovable Cloud — leave empty
 ```
 
-**c.** Restart `bun run dev`. The code automatically detects the Gemini key and switches to Google's endpoint, so no file edits are needed.
+### Which secret does what?
 
-**Note:** some **admin writes** still need `SUPABASE_SERVICE_ROLE_KEY` which you can't get. 95% of user-visible flows are fine without it. For 100% parity you'd have to spin up your own Supabase project (`supabase link` + `supabase db push` all migrations) — a much bigger project. Not worth it for a demo.
+| Env var | Required for | Where to get it | If missing… |
+|---|---|---|---|
+| `VITE_SUPABASE_URL` | everything | already filled above | app won't start |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | everything | already filled above | app won't start |
+| `VITE_SUPABASE_PROJECT_ID` | everything | already filled above | app won't start |
+| `SUPABASE_URL` / `_PUBLISHABLE_KEY` / `_PROJECT_ID` | server functions (SSR) | same values as `VITE_*` | server functions fail |
+| `LOVABLE_API_KEY` | Ask ANVIX, trap-reply, AI trust-report explanations | Lovable editor → project Settings (auto-provisioned) | AI features return an error; the score itself still works |
+| `ANVIX_SIGNAL_PEPPER` | Hashing shared threat intel (`global_signals`) | any random string; generate with `openssl rand -hex 32` | global-signal writes may fail silently |
+| `SUPABASE_SERVICE_ROLE_KEY` | Admin-only writes (very rare in this app) | not exposed on Lovable Cloud | skip — not needed for normal local use |
+
+> The `VITE_*` values are **publishable** keys. RLS still protects every table, so committing them is safe.
 
 ---
 
-## Chrome extension (works in all three options)
+## 5. Start the dev server
 
-1. Find `public/anvix-scanner-v1.0.0.zip` in the project → unzip it.
-2. Chrome → `chrome://extensions` → enable **Developer mode** (top right).
-3. Click **Load unpacked** → pick the unzipped folder.
-4. Right-click any suspicious message on LinkedIn / Gmail / WhatsApp Web → **Scan with Anvix**.
+```bash
+bun dev
+# or: npm run dev
+```
 
-By default the extension calls the live URL. To point it at your local server, edit `extension/background.js` and replace the base URL with `http://localhost:8080`, then reload the extension.
+Open **http://localhost:3000** in your browser. You should see the ANVIX landing page.
 
 ---
 
-## Troubleshooting
+## 6. First-run smoke test (make sure it actually works)
 
-- `bun: command not found` → restart your terminal after installing Bun.
-- Port 8080 in use → `bun run dev -- --port 3000`.
-- Blank page / auth errors → double-check `.env` values (no quotes).
-- AI 401 error → in Option 3, you didn't change the auth header in step (c).
-- **Never commit `.env`** — it's already in `.gitignore`.
+1. Landing page loads → click **Get started** or go to `/auth`.
+2. Sign up with **email + password** (fastest path locally — see the Google note in section 7).
+3. You land on `/dashboard`.
+4. Click **New investigation**, paste a suspicious message (e.g. a fake job offer with a Gmail recruiter and a payment request), and hit **Run investigation**.
+5. Watch the activity log stream live and the progress bar climb — a Trust Score appears within 10–30 seconds.
+6. Try **Ask ANVIX** at `/ask` (needs `LOVABLE_API_KEY`).
 
-## Deploy elsewhere?
+If all six steps pass, your local setup is healthy.
 
-Not recommended for a demo. This project targets Cloudflare Workers via Lovable's build. Moving to Vercel needs a build-preset swap + server.ts edits + retesting. Keep it hosted on Lovable — the URL is free and permanent.
+---
+
+## 7. Google sign-in on localhost
+
+Managed Google OAuth is pre-configured for the deployed URL, not `http://localhost:3000`.
+
+**Simplest fix:** use email + password locally.
+
+**If you really want Google locally:** in the Lovable editor open **Cloud → Users → Auth Settings → Google** and add `http://localhost:3000` to the list of authorized redirect origins. (Custom OAuth clients need the same URL added in the Google Cloud Console.)
+
+---
+
+## 8. (Optional) Retrain the ML model
+
+The trained model lives in `ml/`. Coefficients are already exported to JSON and shipped with the app, so you never *need* to retrain — but if you want to:
+
+```bash
+cd ml
+pip install scikit-learn pandas numpy
+python train_ensemble.py
+```
+
+This regenerates `model_coefficients.json`, `forest_model.json`, and `metrics.json`. Restart `bun dev` afterwards so the new coefficients are loaded.
+
+You'll also need the training dataset (Kaggle *Fake Job Postings* — EMSCAD). Place it as `ml/fake_job_postings.csv` before running the script.
+
+---
+
+## 9. Useful scripts
+
+| Command | What it does |
+|---|---|
+| `bun dev` | Dev server with hot reload (default port 3000) |
+| `bun run build` | Production build |
+| `bun run preview` | Serve the production build locally |
+| `bun run lint` | Run ESLint |
+| `bun run format` | Format everything with Prettier |
+
+---
+
+## 10. Common errors + fixes
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Failed to resolve import "..."` | Dependencies not installed | `bun install` again |
+| `EADDRINUSE: port 3000` | Another app is on port 3000 | `PORT=3001 bun dev` (or kill the other process) |
+| Blank page after sign-in | Stale session in localStorage | Open DevTools → Application → Local Storage → clear the `sb-*` keys → hard-refresh |
+| AI features return 401 / "unauthorized" | `LOVABLE_API_KEY` missing or invalid | Fill it in `.env`, restart dev server |
+| `Expected 3 parts in JWT; got 1` | Wrong Supabase key in a `VITE_*` var | Make sure it starts with `sb_publishable_` — never paste the service-role key into a `VITE_*` var |
+| Windows: `bun` not recognized | PATH not refreshed | Close and reopen the terminal, or reboot |
+| `.env` values ignored | File in wrong location or wrong name | Must be exactly `.env` in the **project root**, not `.env.txt` |
+| Realtime activity log not updating | Ad-blocker blocking WebSockets | Whitelist `*.supabase.co` |
+
+---
+
+## 11. Architecture / codebase tour
+
+For a full walkthrough of the folders, database, scoring math, ML pipeline, and every route — see **`PROJECT_WALKTHROUGH.md`** in the repo root. That's the doc to skim before your lecture.
+
+---
+
+## 12. Pushing your local changes back to Lovable
+
+- **If you cloned from GitHub:** normal Git workflow.
+  ```bash
+  git add .
+  git commit -m "your changes"
+  git push
+  ```
+  Lovable's GitHub sync is bidirectional — your commits appear in the Lovable editor within seconds.
+
+- **If you downloaded a ZIP:** you can't push back until you connect the project to GitHub first. Do that (Lovable editor → **+** → GitHub → Connect project), then `git clone` the new repo and copy your edits over.
+
+---
+
+You're set. Run `bun dev` and open http://localhost:3000. 🎯
