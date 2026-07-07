@@ -52,12 +52,21 @@ function Landing() {
           >
             Try without signing in
           </Link>
-          <Link
-            to={isAuthed ? "/dashboard" : "/auth"}
-            className="rounded-md border border-border bg-surface px-3.5 py-1.5 text-sm hover:bg-accent"
-          >
-            {isAuthed ? "Dashboard" : "Sign in"}
-          </Link>
+          {isAuthed ? (
+            <Link
+              to="/dashboard"
+              className="rounded-md border border-border bg-surface px-3.5 py-1.5 text-sm hover:bg-accent"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              to="/auth"
+              className="rounded-md border border-border bg-surface px-3.5 py-1.5 text-sm hover:bg-accent"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       </header>
 
