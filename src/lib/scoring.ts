@@ -52,8 +52,8 @@ export function scoreFeatures(features: FeatureVector): {
   let category: RiskCategory;
   if (score >= 85) category = "trusted";
   else if (score >= 70) category = "likely_safe";
-  else if (score >= 50) category = "caution";
-  else if (score >= 30) category = "high_risk";
+  else if (score >= 55) category = "caution";
+  else if (score >= 45) category = "high_risk";
   else category = "fraudulent";
 
   // importance = |contribution| normalized
