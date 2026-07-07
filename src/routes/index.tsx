@@ -69,20 +69,26 @@ function Landing() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              to="/investigate"
+              to="/ask"
               className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
-              Start investigating — no login needed <ArrowRight className="h-4 w-4" />
+              Ask ANVIX — 5-second check <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              to="/auth"
+              to="/investigate"
               className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-5 py-2.5 text-sm hover:bg-accent"
             >
-              Sign in to save history
+              Run a full investigation
+            </Link>
+            <Link
+              to="/check-payment"
+              className="inline-flex items-center gap-2 rounded-md border border-warning/50 bg-warning/10 px-5 py-2.5 text-sm text-warning hover:bg-warning/20"
+            >
+              Before you pay — check UPI / account
             </Link>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            No account required. Sign in only to download the PDF report or save to history.
+            No account required. Sign in only to save history or download the full PDF report.
           </p>
         </section>
 

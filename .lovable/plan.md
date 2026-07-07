@@ -1,67 +1,94 @@
-# ANVIX V2 — Report Redesign Plan
+# ANVIX Rescue Kit
 
-Redesign the investigation report from a technical dashboard into a plain-English trust verdict. All existing backend logic (SPF/DMARC/DNS/WHOIS/SSL, Kaggle-LR, ensemble, playbooks, live verification, AI narrative) stays intact — we only restructure the UI on `src/routes/_authenticated/investigations.$id.tsx` and add a few presentation components.
+Four new features that together turn ANVIX from "a scam scanner" into "the thing every job seeker in India actually needs before, during, and after a scam". Plus one small removal.
 
-## New report structure (top → bottom)
+## 0. Remove the broken WhatsApp share button
 
-1. **Verdict Hero** — big colored banner
-   - Emoji + label: 🟢 Trusted / 🟡 Needs Verification / 🟠 Suspicious / 🔴 Likely Scam
-   - One-line human decision: "Do NOT continue" / "Verify first" / "Looks safe"
-   - Emotional headline: "Stop." / "Be careful." / "Good news."
-   - Small trust score chip underneath (e.g. `18/100`)
+Chrome now blocks `api.whatsapp.com/send` links on desktop (`ERR_BLOCKED_BY_RESPONSE`). Remove the WhatsApp button from `ShareCompletionCard`. Keep Copy link, Telegram, and native Share — those work.
 
-2. **Top 3 Reasons** — plain English, no jargon
-   - Auto-translated from existing findings (SPF→"sender email couldn't be fully verified", WHOIS→"couldn't verify when this website was registered", etc.)
+---
 
-3. **What Should I Do Now?** — action checklist
-   - ✓ Do / ❌ Don't columns
-   - Uses existing `narrative.action_checklist` + a "Do NOT pay / share Aadhaar / share PAN / share bank details" default block for scam verdicts
+## 1. "Ask ANVIX" — the 5-second check (the easy one you asked for)
 
-4. **What Scammers Usually Do Next** — from existing `narrative.next_predicted_asks`
+**The problem it solves:** Most users don't have a PDF, a screenshot, or an email. They just have a message on WhatsApp and a bad feeling. Filling out a form is too much friction.
 
-5. **Investigation Timeline** — animated checklist
-   - Files uploaded → Text extracted → Recruiter analysed → Website checked → Domain verified → Scam DB compared → AI reasoning → Final score
+**How it feels:**
+- New route `/ask` + a big floating "Ask ANVIX" button on every page.
+- One giant textbox: *"Paste any message or ask anything — 'Amazon recruiter asking ₹500 joining fee, real or scam?'"*
+- Hit send → 3-second reply in plain English: verdict emoji + one-line reason + one action ("Do not pay. This is a scam.").
+- If ANVIX needs more info, it asks one follow-up question, not a form.
+- Full investigation is offered as an optional "Want a full report?" button underneath.
 
-6. **Explain Like I'm New to Job Hunting** — collapsible
-   - Uses existing `narrative.narrative` (already plain English)
+**Why nobody has this:** every scam-checker forces you into a form. Ours is a conversation.
 
-7. **Investigation Summary stats** — replaces "Confidence 98%"
-   - Checks performed / Passed / Warnings / Failed (derived from existing verifications)
+**Tech:** new `src/routes/ask.tsx` + `src/lib/ask.functions.ts` calling the AI gateway with the same Kaggle model + verification signals, but tuned for one-shot conversational input. Reuses existing scoring.
 
-8. **Evidence** — kept, grouped by kind (Website/Email/Offer/Screenshot/WhatsApp)
+---
 
-9. **Technical Investigation** — collapsed by default
-   - All current SPF/DMARC/DNS/MX/WHOIS/SSL/headers/ensemble/LR/GBM detail moves inside this accordion
+## 2. UPI / Bank Account Scanner — the "before you pay" check
 
-10. **Final Recommendation** — sticky footer card with one decision + share/PDF buttons (existing ShareCompletionCard reused)
+**Problem:** Scammers reuse the same UPI IDs and bank accounts across hundreds of victims.
 
-## New files
+**How it feels:**
+- New route `/check-upi` + prominent card on the home page.
+- One textbox: *"Paste the UPI ID, bank account, or phone number they asked you to pay"*.
+- Instant verdict: *"🚨 This UPI has been flagged by 12 ANVIX users. Total reported losses: ₹47,000. Do NOT pay."* or *"No reports yet — but always verify before sending money."*
+- If not found, user can report it in one tap — grows the community database.
 
-- `src/lib/plain-language.ts` — pure mapper: technical finding string → human sentence. Covers SPF, DMARC, DNS, MX, WHOIS, SSL, TLD, free-email-recruiter, payment_request, crypto, urgency, grammar, etc.
-- `src/lib/verdict.ts` — maps `RiskCategory` + score → `{ emoji, label, headline, decision, tone, color }` for the hero.
-- `src/components/report/VerdictHero.tsx`
-- `src/components/report/TopReasons.tsx`
-- `src/components/report/ActionChecklist.tsx`
-- `src/components/report/NextSteps.tsx`
-- `src/components/report/InvestigationTimeline.tsx`
-- `src/components/report/ChecksSummary.tsx`
-- `src/components/report/TechnicalAccordion.tsx` (wraps all current technical panels)
+**Tech:** reuses the existing `global_signals` table (already stores `kind`, `value_hash`, `report_count`, `last_seen`). Adds `kind` values `upi`, `bank_account`, `phone_number`. New server fns `checkPaymentIdentifier` and `reportPaymentIdentifier`. Uses the existing `ANVIX_SIGNAL_PEPPER` secret for hashing.
 
-## Edited files
+---
 
-- `src/routes/_authenticated/investigations.$id.tsx` — reorder into the new structure; move current technical UI into `<TechnicalAccordion>`.
-- `src/lib/report-pdf.ts` — rebuild PDF layout to mirror new order (Cover → Verdict → Reasons → Recommendations → Timeline → Evidence → Technical Appendix).
+## 3. One-Click Cybercrime FIR
 
-## Out of scope (keeps working as-is)
+**Problem:** If someone already lost money, they have 24–72 hours to file a complaint at cybercrime.gov.in to freeze the scammer's account. But the portal is confusing and most people give up.
 
-- Scoring engine, Kaggle LR, ensemble, playbooks, live verification, AI narrative generation, share cards, extension, ML pipeline.
-- Auth, routing, database schema.
-- No new AI calls — everything is a UI reorganization + a deterministic plain-language mapper.
+**How it feels:**
+- Button on any completed investigation: **"Generate cybercrime complaint (PDF)"**.
+- One dialog asks: your name, phone, amount lost (₹), date paid.
+- Downloads a ready-to-submit PDF pre-filled with:
+  - Complainant details
+  - Incident summary (auto-written from the investigation)
+  - Scammer identifiers pulled from evidence (UPI, email, phone, website)
+  - Timeline of events
+  - Applicable IPC sections (419, 420, 66C, 66D)
+  - Evidence list
+  - Signature line
+- Includes a mini step-by-step guide: "Go to cybercrime.gov.in → Report → File a Complaint → Upload this PDF as attachment."
 
-## Success check
+**Tech:** new `src/lib/fir-pdf.ts` reusing pdf-lib (already installed). Reads existing investigation + evidence + extracted URLs/emails/phones. New dialog component `<GenerateFIRDialog>`.
 
-After build, open an existing investigation and confirm:
-- Verdict + color visible above the fold
-- Zero acronyms (SPF/DMARC/WHOIS/DNS/MX/SSL) visible before opening the technical accordion
-- Timeline, next-steps, action checklist all render
-- PDF export still works
+---
+
+## 4. Trap-Reply Generator — turn the victim into an investigator
+
+**Problem:** After a scan, users want to keep talking to the scammer to extract more proof — but don't know what to say without spooking them.
+
+**How it feels:**
+- Button on any high-risk investigation: **"Generate a safe reply"**.
+- ANVIX proposes 2–3 messages tuned to extract more evidence, e.g.:
+  - "Can you send me the offer letter on your @microsoft.com email? I don't accept scans from personal accounts."
+  - "Please share the company registration number so my parents can verify."
+- User picks one → copies to clipboard → sends to scammer.
+- When the scammer replies, user pastes the reply back into ANVIX → it re-scores the case and updates the verdict with the new evidence.
+
+**Tech:** new `src/lib/trap-reply.functions.ts` calling the AI gateway with existing evidence context. New component `<TrapReplyDialog>` on the investigation detail route.
+
+---
+
+## Order of build
+
+1. Remove broken WhatsApp button (2 min)
+2. Ask ANVIX chat — biggest UX win, users see it first
+3. UPI Scanner — biggest social-impact win, shareable link
+4. Cybercrime FIR generator — the "after the scam" service
+5. Trap-Reply Generator — the deep-user feature
+
+Each ships as a working feature on its own; if you want to stop after any step, ANVIX is already noticeably better.
+
+## Out of scope
+
+- No new AI provider needed (Lovable AI Gateway covers all four).
+- No new database tables — reuses `global_signals`, `investigations`, `evidence`.
+- No auth changes.
+- No voice-call feature (you said no).
