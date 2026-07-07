@@ -178,10 +178,12 @@ def main():
     m_gbm = metrics_block(yte, gbm_pred, gbm_proba)
     print(f"GBM (thr={best_thr:.2f}):", m_gbm)
 
-    # Ensemble: weighted mean of LR and GBM probabilities
-    w_lr, w_gbm = 0.35, 0.65
-    ens_proba = w_lr * lr_proba + w_gbm * gbm_proba
-    thresholds = np.linspace(0.1, 0.6, 26)
+    # Ensemble: logit-average of LR and GBM (rescales GBM's tighter distribution).
+    def logit(p): return np.log(np.clip(p, 1e-6, 1 - 1e-6) / (1 - np.clip(p, 1e-6, 1 - 1e-6)))
+    def sig(z):   return 1 / (1 + np.exp(-z))
+    w_lr, w_gbm = 0.30, 0.70
+    ens_proba = sig(w_lr * logit(lr_proba) + w_gbm * logit(gbm_proba))
+    thresholds = np.linspace(0.02, 0.6, 30)
     f1s = [f1_score(yte, (ens_proba >= t).astype(int), zero_division=0) for t in thresholds]
     ens_thr = float(thresholds[int(np.argmax(f1s))])
     ens_pred = (ens_proba >= ens_thr).astype(int)
