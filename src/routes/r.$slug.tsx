@@ -72,7 +72,7 @@ export const Route = createFileRoute("/r/$slug")({
 });
 
 function PublicReportView() {
-  const { report } = Route.useLoaderData();
+  const { report } = Route.useLoaderData() as { report: PublicReport };
   const tone = verdictTone(report.trust_score);
   const created = new Date(report.created_at).toLocaleDateString(undefined, {
     year: "numeric",
