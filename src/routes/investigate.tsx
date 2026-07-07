@@ -21,6 +21,10 @@ import {
 } from "@/lib/guest-storage";
 import { generateReportPDF, downloadPDF } from "@/lib/report-pdf";
 import { RISK_META } from "@/lib/scoring";
+import { getVerdict } from "@/lib/verdict";
+import { VerdictHero } from "@/components/report/VerdictHero";
+import { ActionChecklist } from "@/components/report/ActionChecklist";
+import { NextSteps } from "@/components/report/NextSteps";
 import { createPublicReport } from "@/lib/share.functions";
 import { ShareCompletionCard } from "@/components/ShareCompletionCard";
 import {
@@ -862,52 +866,17 @@ function ReportView({
         </div>
       </div>
 
-      {/* Headline card */}
+      {/* Verdict hero — the one answer users care about */}
+      <VerdictHero
+        verdict={getVerdict(r.risk_category)}
+        score={r.trust_score}
+        caseName={record.name}
+      />
+
+      {/* Narrative + recommendation, in plain English */}
       <div className="glass rounded-2xl p-6">
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">
-              Trust score
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-6xl font-semibold tracking-tight" style={{ color: meta.color }}>
-                {r.trust_score}
-              </span>
-              <span className="text-lg text-muted-foreground">/100</span>
-              <span
-                className="ml-2 rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
-                style={{ borderColor: `${meta.color}55` }}
-                title={r.confidence_band.reason}
-              >
-                ± {r.confidence_band.band}
-              </span>
-            </div>
-            <div
-              className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-              style={{ background: `${meta.color}18`, color: meta.color }}
-            >
-              {meta.label}
-            </div>
-            <div className="mt-2 text-xs text-muted-foreground">
-              Range: {r.confidence_band.low}–{r.confidence_band.high} · {r.confidence_band.reason}
-            </div>
-          </div>
-          <div className="grid gap-2 text-sm">
-            <Stat
-              label="Ensemble P(fraud)"
-              value={`${(r.ensemble_breakdown.ensemble * 100).toFixed(1)}%`}
-            />
-            <Stat
-              label="LR / GBM"
-              value={`${(r.ensemble_breakdown.lr * 100).toFixed(0)}% / ${(r.ensemble_breakdown.gbm * 100).toFixed(0)}%`}
-            />
-            <Stat label="Weighted baseline" value={`${r.weighted_score}/100`} />
-            <Stat label="Confidence" value={`${(r.confidence * 100).toFixed(0)}%`} />
-            <Stat label="Evidence items" value={String(record.input.evidence.length)} />
-          </div>
-        </div>
         {n?.headline && (
-          <div className="mt-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-base font-medium">
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-base font-medium">
             {n.headline}
           </div>
         )}
@@ -918,6 +887,21 @@ function ReportView({
           <span className="font-medium text-primary">Recommendation:</span> {r.recommendation}
         </div>
       </div>
+
+      {/* Do / Don't checklist */}
+      <ActionChecklist
+        verdict={getVerdict(r.risk_category)}
+        aiActions={n?.action_checklist}
+      />
+
+      {/* What scammers usually ask for next */}
+      <NextSteps
+        predicted={n?.next_predicted_asks}
+        isScam={
+          r.risk_category === "fraudulent" || r.risk_category === "high_risk"
+        }
+      />
+
 
       {/* Shareable public link (Track 7) */}
       {record.public_slug && (
