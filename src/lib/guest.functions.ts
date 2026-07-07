@@ -281,8 +281,17 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       employment_specified: /full.?time|part.?time|contract|internship|freelance/i.test(corpus)
         ? 1
         : 0,
+      salary_missing: /\b(salary|compensation|pay|ctc|package|per\s*(year|month|annum))\b/i.test(corpus) ? 0 : 1,
+      location_missing: /\b(remote|onsite|hybrid|bengaluru|bangalore|mumbai|delhi|chennai|london|new\s*york|san\s*francisco|city|address|location)\b/i.test(corpus) ? 0 : 1,
+      title_shouty: (() => {
+        const name = data.name ?? "";
+        const upper = [...name].filter((c) => c >= "A" && c <= "Z").length;
+        return name.length > 4 && upper / name.length > 0.6 ? 1 : 0;
+      })(),
+      url_count_norm: Math.min(aggregatedUrls.length, 5) / 5,
     };
     const pFraud = predictFraudProbability(kf);
+    const ens = predictEnsemble(kf);
     const kaggleContribs = featureContributions(kf);
 
     // -- Weighted-baseline for comparison + explainability --
