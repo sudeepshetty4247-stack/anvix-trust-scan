@@ -1,75 +1,61 @@
-## Goal
-Close the three remaining gaps in one pass: (1) real signal-cloud data, (2) false-positive control for the "verified domain" bonus, (3) Chrome Web Store–ready extension package.
+# Run Anvix locally on your system
 
----
+Goal: get the whole project (frontend + server functions + database + AI) running on your laptop, using the same Lovable Cloud backend so nothing breaks.
 
-## Track 1 — Live data quality (Signal Cloud)
+## What you need installed (one time)
+- Node.js 20+ (https://nodejs.org)
+- Bun (https://bun.sh — `curl -fsSL https://bun.sh/install | bash`)
+- Git
+- VS Code (or any editor)
 
-Move the cloud from "seed only" to "self-populating from real investigations" plus a curated real-world seed.
+## Steps
 
-**Backend**
-- Migration: add `contribution_count`, `first_seen_at`, `last_seen_at`, `source` (`user` | `seed` | `curated`) to `global_signals` if missing; add unique index on `(signal_type, signal_value_hash)`.
-- Trigger `after insert on investigation_signals` → upsert into `global_signals`, incrementing `contribution_count` and updating `last_seen_at` (peppered hash, no raw PII).
-- Backfill: one-shot SQL to roll existing `investigation_signals` into `global_signals`.
+### 1. Get the code
+- In Lovable, click GitHub → Connect to GitHub → Create Repository.
+- On your laptop: `git clone <your-repo-url>` then `cd <folder>`.
 
-**Curated real seed**
-- Replace `ml/seed_global_signals.mjs` output with a curated list drawn from public scam feeds (URLhaus, OpenPhish, FTC scam-job bulletins) — ~2–3k rows, tagged `source='curated'`, dated.
-- Insert via `supabase--insert` (data, not schema).
+### 2. Install dependencies
+```
+bun install
+```
 
-**UI**
-- Landing "Signal Cloud" stays removed (per your last request). Instead surface density inside the investigation result: a small "Seen by community: N reports in last 30d" chip next to each matched signal — pulled from `global_signals.contribution_count`.
+### 3. Create a `.env` file in the project root
+The project needs these variables. I will give you the exact names; values come from Lovable (Project → Settings → Cloud, or I can list the public ones for you):
 
----
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+VITE_SUPABASE_PROJECT_ID=...
+SUPABASE_URL=...
+SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+LOVABLE_API_KEY=...
+ANVIX_SIGNAL_PEPPER=any-random-string
+```
 
-## Track 2 — False-positive control (verified-domain bonus)
+- The `VITE_*` and public URL/keys are safe to share — I can print them for you.
+- `SUPABASE_SERVICE_ROLE_KEY` and `LOVABLE_API_KEY` are **not accessible** on Lovable Cloud, so for full local functionality (AI explanations, admin writes) you have two choices:
+  - **Option A (easiest):** Run locally *without* those two — the app boots, landing page works, scans that only need public reads work. AI-generated explanation and privileged writes will fail.
+  - **Option B (full parity):** Create your own free Supabase project + your own AI provider key (OpenAI/Gemini) and point the app at it. This is a bigger change.
 
-Give the ML score a real legitimate-offer benchmark so the domain bonus is tuned, not guessed.
+### 4. Run the dev server
+```
+bun run dev
+```
+Open http://localhost:8080 — same app as the Lovable preview.
 
-**Dataset**
-- New file `ml/legit_offers.jsonl`: ~200 hand-labeled real offers (LinkedIn, Greenhouse, Lever, Workday, company career pages). Fields: `text`, `domain`, `label='legit'`.
-- Combine with existing Kaggle scam set → `ml/eval_mixed.jsonl`.
+### 5. Database
+- Stays on Lovable Cloud (no local Postgres needed).
+- Your local app connects to it via the same URL/keys.
+- No migration or data copy required.
 
-**Evaluation script**
-- `ml/evaluate.mjs`: runs current scoring pipeline over `eval_mixed.jsonl`, outputs confusion matrix, precision/recall at score thresholds 40/60/80, and FP rate specifically on `label='legit'` rows.
-- Sweep `verifiedDomainBonus` across {0, 5, 10, 15, 20} and pick the value minimizing FP while keeping recall ≥ current.
+### 6. Chrome extension (local test)
+- Already built in `public/anvix-scanner-v1.0.0.zip`.
+- Unzip → `chrome://extensions` → Developer mode → Load unpacked.
+- It will call your local `http://localhost:8080` if you edit `extension/manifest.json` host, otherwise it hits the published URL.
 
-**Code changes**
-- `src/lib/confidence.ts` (or wherever the bonus lives): move `VERIFIED_DOMAIN_BONUS` to a single named constant with the tuned value + a comment linking to the eval report.
-- Add `ml/EVAL_REPORT.md` with the confusion matrix and chosen threshold — this is what you cite in the viva.
+## What I need from you before writing the final plan
+1. Do you want **Option A** (quick local run, some AI features off) or **Option B** (full parity with your own Supabase + AI key)?
+2. Are Node and Bun already installed on your laptop, or do you want install instructions for your OS (Windows / Mac / Linux)?
 
-**UI**
-- Result card: when the domain bonus fires, show "Verified employer domain (−N risk)" as an explicit line item so reviewers see why the score dropped.
-
----
-
-## Track 3 — Chrome Web Store distribution
-
-Make the extension store-submittable and swap the manual ZIP flow for a real listing.
-
-**Extension polish (`/extension`)**
-- `manifest.json`: bump to a clean `1.0.0`, add `homepage_url`, `author`, tighten `permissions` to only what's used (drop `tabs` if `activeTab` suffices), add `host_permissions` array instead of broad `<all_urls>` if possible.
-- Icons: generate 16/32/48/128 PNGs (currently only one icon).
-- `privacy.html` route in the app + link from manifest — Chrome Web Store requires a privacy policy URL.
-- Store screenshots: 1280×800, 3–5 shots of the extension analyzing a real job page.
-- `store-listing.md`: title, short description (132 chars), detailed description, category (`Productivity`), single-purpose declaration.
-
-**Packaging**
-- Update the zip script to exclude source maps and the icon source, produce `anvix-scanner-v1.0.0.zip`.
-- Keep the "Load unpacked" flow as fallback; add a "Coming to Chrome Web Store" badge with a placeholder store URL constant (`CHROME_STORE_URL` in `src/lib/constants.ts`) — swap once approved.
-
-**Submission checklist doc**
-- `extension/SUBMISSION.md`: step-by-step of what you (the human) do in the Chrome Developer Dashboard — $5 fee, upload zip, paste description, screenshots, privacy URL, justification for each permission. This is the only step Lovable can't automate.
-
----
-
-## Deliverables summary
-
-| Track | New files | Edited files | Migrations |
-|---|---|---|---|
-| Signal cloud | `ml/curated_seed.mjs` | trigger via migration, result card chip | 1 |
-| FP control | `ml/legit_offers.jsonl`, `ml/evaluate.mjs`, `ml/EVAL_REPORT.md` | `src/lib/confidence.ts`, result card | 0 |
-| Extension | 4 icons, `privacy.html` route, `extension/SUBMISSION.md`, `store-listing.md`, screenshots | `manifest.json`, zip script, `src/lib/constants.ts`, extension download UI | 0 |
-
-Total: 1 migration, ~10 new files, ~6 edits. All three tracks land in a single build pass.
-
-Approve and I'll switch to build mode and ship it.
+Once you answer, I will finalize the exact commands and `.env` contents for your machine.
