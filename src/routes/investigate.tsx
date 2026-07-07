@@ -87,7 +87,35 @@ function GuestInvestigate() {
   useEffect(() => {
     const r = readGuestCurrent();
     if (r) setRecord(r);
+
+    // Hydrate from ?intake=... (Chrome extension context-menu deep link)
+    try {
+      const usp = new URLSearchParams(window.location.search);
+      const raw = usp.get("intake");
+      if (!raw) return;
+      const pad = raw.length % 4 === 0 ? "" : "=".repeat(4 - (raw.length % 4));
+      const b64 = raw.replace(/-/g, "+").replace(/_/g, "/") + pad;
+      const decoded = decodeURIComponent(escape(atob(b64)));
+      const intake = JSON.parse(decoded) as {
+        v?: number;
+        source_url?: string;
+        source_title?: string;
+        selection?: string;
+        link_url?: string;
+        channel?: string;
+      };
+      if (intake.selection) setFreeText(intake.selection);
+      if (intake.source_url || intake.link_url) setFreeUrl(intake.link_url || intake.source_url || "");
+      const label = intake.source_title || intake.channel || "Investigation from extension";
+      setCaseName(`[${(intake.channel || "web").toUpperCase()}] ${label}`.slice(0, 120));
+      toast.success("Evidence loaded from Chrome extension.");
+      // Clean the URL so a page refresh doesn't reload the intake.
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {
+      /* ignore malformed intake */
+    }
   }, []);
+
 
   const addFiles = useCallback(
     async (files: FileList | File[]) => {
