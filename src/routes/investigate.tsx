@@ -415,20 +415,33 @@ function GuestInvestigate() {
     setCaseName("");
   };
 
-  const requireAuth = async (intent: "save" | "download"): Promise<boolean> => {
+  const requireAuth = async (intent: "save" | "download", trustKnownAuth = false): Promise<boolean> => {
+    if (trustKnownAuth && isAuthed) return true;
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      setIsAuthed(true);
+      return true;
+    }
+
     const { data: sess } = await supabase.auth.getSession();
-    if (sess.session) return true;
+    if (sess.session) {
+      setIsAuthed(true);
+      return true;
+    }
+
+    setIsAuthed(false);
     setAuthOpen(intent);
     return false;
   };
 
-  const doSave = async () => {
+  const doSave = async (trustKnownAuth = false) => {
     if (!record) return;
     if (savedInvestigationId) {
       toast.success("Already saved to your history");
       return;
     }
-    if (!(await requireAuth("save"))) return;
+    if (!(await requireAuth("save", trustKnownAuth))) return;
     setClaiming(true);
     try {
       const { id } = await claimFn({
@@ -441,22 +454,36 @@ function GuestInvestigate() {
       setSavedInvestigationId(id);
       toast.success("Saved to your history");
     } catch (e) {
-      toast.error((e as Error).message || "Save failed");
+      const message = (e as Error).message || "Save failed";
+      if (/unauthorized|authorization|jwt|session/i.test(message)) {
+        setIsAuthed(false);
+        setAuthOpen("save");
+        toast.error("Your sign-in session needs refreshing. Please sign in once more.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setClaiming(false);
     }
   };
 
-  const doDownload = async () => {
+  const doDownload = async (trustKnownAuth = false) => {
     if (!record) return;
-    if (!(await requireAuth("download"))) return;
+    if (!(await requireAuth("download", trustKnownAuth))) return;
     setDownloading(true);
     try {
       const bytes = await generateReportPDF(record);
       downloadPDF(bytes, `ANVIX_${record.name.replace(/[^a-z0-9]+/gi, "_")}.pdf`);
       toast.success("Report downloaded");
     } catch (e) {
-      toast.error((e as Error).message || "Download failed");
+      const message = (e as Error).message || "Download failed";
+      if (/unauthorized|authorization|jwt|session/i.test(message)) {
+        setIsAuthed(false);
+        setAuthOpen("download");
+        toast.error("Your sign-in session needs refreshing. Please sign in once more.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setDownloading(false);
     }
@@ -669,8 +696,9 @@ function GuestInvestigate() {
           onClose={() => setAuthOpen(null)}
           onAuthed={() => {
             const i = authOpen;
+            setIsAuthed(true);
             setAuthOpen(null);
-            setTimeout(() => (i === "download" ? doDownload() : doSave()), 200);
+            setTimeout(() => (i === "download" ? doDownload(true) : doSave(true)), 200);
           }}
         />
       )}
