@@ -9,7 +9,7 @@
  * confusion matrix and sweep that justifies this number. Do NOT change
  * without re-running the evaluator.
  */
-export const VERIFIED_DOMAIN_BONUS = 15;
+export const VERIFIED_DOMAIN_BONUS = 10;
 
 /**
  * Chrome Web Store listing URL. Empty string until the extension is
