@@ -408,6 +408,21 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
               ? "high_risk"
               : "fraudulent";
 
+    // Confidence band (Track 8.2)
+    const confidence_band = computeConfidence({
+      trust_score: trust,
+      lr: ens.lr,
+      gbm: ens.gbm,
+      evidence_present: {
+        url: aggregatedUrls.length > 0,
+        email: aggregatedEmails.length > 0,
+        offer_pdf: data.evidence.some((e) => /pdf/i.test(e.kind)),
+        screenshot: data.evidence.some((e) => /image|screenshot|png|jpg/i.test(e.kind)),
+        text: aggregatedText.length > 100,
+      },
+      community_hits: communitySignals.length,
+    });
+
     // -- Explainability text --
     const negatives: string[] = [];
     const positives: string[] = [];
