@@ -919,6 +919,17 @@ function ReportView({
         </div>
       </div>
 
+      {/* Shareable public link (Track 7) */}
+      {record.public_slug && (
+        <ShareCompletionCard
+          slug={record.public_slug}
+          caseName={record.name}
+          trustScore={r.trust_score}
+          verdict={RISK_META[r.risk_category].label}
+          origin={typeof window !== "undefined" ? window.location.origin : "https://vetting-forge-ai.lovable.app"}
+        />
+      )}
+
       {/* Community intelligence — the network-effect moment */}
       {r.community_signals.length > 0 && (
         <div className="glass overflow-hidden rounded-2xl border border-destructive/40 bg-destructive/5">
