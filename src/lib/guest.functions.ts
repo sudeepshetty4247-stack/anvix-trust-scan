@@ -332,9 +332,9 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     };
     const weighted = scoreFeatures(wf);
 
-    // -- Final score: blend Kaggle-LR probability (60%) with weighted baseline (40%) --
-    const trust_from_lr = Math.round((1 - pFraud) * 100);
-    const trust = Math.round(trust_from_lr * 0.6 + weighted.score * 0.4);
+    // -- Final score: blend Kaggle Ensemble (LR+GBM) probability (65%) with weighted baseline (35%) --
+    const trust_from_ml = Math.round((1 - ens.ensemble) * 100);
+    const trust = Math.round(trust_from_ml * 0.65 + weighted.score * 0.35);
     const category: RiskCategory =
       trust >= 85
         ? "trusted"
