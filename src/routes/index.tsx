@@ -13,6 +13,7 @@ import {
   Download,
 } from "lucide-react";
 import { getSignalCloud } from "@/lib/global-signals.functions";
+import { listRecentPublicReports } from "@/lib/share.functions";
 
 export const Route = createFileRoute("/")({
   ssr: false,
