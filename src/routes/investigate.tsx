@@ -1094,6 +1094,11 @@ function ReportView({
           </ul>
         </div>
       )}
+          </div>
+        )}
+      </section>
+
+
 
 
       {/* Playbook match — the wow moment */}
