@@ -102,6 +102,84 @@ export type Database = {
           },
         ]
       }
+      global_signals: {
+        Row: {
+          first_seen: string
+          hash: string
+          id: string
+          kind: Database["public"]["Enums"]["signal_kind"]
+          last_seen: string
+          report_count: number
+          sample_context: string | null
+          severity: Database["public"]["Enums"]["signal_severity"]
+          source: string
+        }
+        Insert: {
+          first_seen?: string
+          hash: string
+          id?: string
+          kind: Database["public"]["Enums"]["signal_kind"]
+          last_seen?: string
+          report_count?: number
+          sample_context?: string | null
+          severity?: Database["public"]["Enums"]["signal_severity"]
+          source?: string
+        }
+        Update: {
+          first_seen?: string
+          hash?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["signal_kind"]
+          last_seen?: string
+          report_count?: number
+          sample_context?: string | null
+          severity?: Database["public"]["Enums"]["signal_severity"]
+          source?: string
+        }
+        Relationships: []
+      }
+      investigation_signals: {
+        Row: {
+          created_at: string
+          id: string
+          investigation_id: string
+          matched_value_preview: string
+          signal_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          investigation_id: string
+          matched_value_preview: string
+          signal_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          investigation_id?: string
+          matched_value_preview?: string
+          signal_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigation_signals_investigation_id_fkey"
+            columns: ["investigation_id"]
+            isOneToOne: false
+            referencedRelation: "investigations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investigation_signals_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "global_signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investigations: {
         Row: {
           best_model: string | null
@@ -308,6 +386,14 @@ export type Database = {
         | "caution"
         | "high_risk"
         | "fraudulent"
+      signal_kind:
+        | "email"
+        | "phone"
+        | "domain"
+        | "recruiter"
+        | "payment_handle"
+        | "offer_pattern"
+      signal_severity: "info" | "warning" | "high" | "critical"
       verification_status:
         | "pending"
         | "running"
@@ -459,6 +545,15 @@ export const Constants = {
         "high_risk",
         "fraudulent",
       ],
+      signal_kind: [
+        "email",
+        "phone",
+        "domain",
+        "recruiter",
+        "payment_handle",
+        "offer_pattern",
+      ],
+      signal_severity: ["info", "warning", "high", "critical"],
       verification_status: [
         "pending",
         "running",
