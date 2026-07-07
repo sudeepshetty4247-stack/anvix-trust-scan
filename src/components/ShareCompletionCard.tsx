@@ -85,16 +85,8 @@ export function ShareCompletionCard({ slug, caseName, trustScore, verdict, origi
             </>
           )}
         </button>
-        {/* WhatsApp share removed — Chrome blocks api.whatsapp.com/send links on desktop.
-            Telegram + Copy link + native share cover the mobile case. */}
-        <a
-          href={`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-md bg-[#0088cc] px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          <Send className="h-4 w-4" /> Telegram
-        </a>
+        {/* Share options: copy link + native share sheet (mobile). */}
+
         {typeof navigator !== "undefined" && "share" in navigator && (
           <button
             type="button"
