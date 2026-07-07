@@ -1,136 +1,125 @@
-# Run Anvix Locally — Full Parity (nothing disabled)
+# Run Anvix Locally — Honest Guide
 
-Goal: every feature that works on the live site works on your laptop — AI explanations, scans, admin writes, uploads, extension, everything.
-
-Because two of the keys (`LOVABLE_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY`) are managed by Lovable Cloud and cannot be exported, "full parity locally" means you bring your **own** Supabase project + your **own** AI provider key. This guide walks through it end-to-end.
+This project runs on **Lovable Cloud** (database, auth, storage) + **Lovable AI Gateway** (the AI explanation feature). Two of those keys (`LOVABLE_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) only exist inside Lovable and cannot be exported. So there is no "clone and run with 100% features and zero signup" path. Pick one of the three options below.
 
 ---
 
-## 1. Install prerequisites (one time)
+## Option 1 — Just use the live URL (recommended for college demo)
 
-- **Node.js 20+** → https://nodejs.org
-- **Bun** → https://bun.sh
+Nothing to install. Everything works.
+
+- Live app: **https://anvix-trust-scan.lovable.app**
+- Full AI, full database, full extension backend — already live.
+- For your submission: share this URL + your GitHub repo link + a screen recording.
+
+**This is what most Lovable college projects do.** No local setup risk on demo day.
+
+---
+
+## Option 2 — Run locally (AI features off, everything else works)
+
+No third-party signup needed. You lose only the AI-generated explanation paragraph and evidence auto-extraction from screenshots/PDFs. Landing page, sign-in, dashboard, scans, database, extension — all work.
+
+### Steps
+
+**1. Install once**
+- Node.js 20+ → https://nodejs.org
+- Bun → https://bun.sh
   - macOS/Linux: `curl -fsSL https://bun.sh/install | bash`
   - Windows: `powershell -c "irm bun.sh/install.ps1 | iex"`
-- **Git** → https://git-scm.com
-- **Supabase CLI** → https://supabase.com/docs/guides/local-development/cli/getting-started
+- Git → https://git-scm.com
 
-## 2. Get the code
-
+**2. Get the code**
 In Lovable: **GitHub → Connect to GitHub → Create Repository**, then:
-
 ```bash
 git clone <your-repo-url>
 cd <your-repo-folder>
 bun install
 ```
 
-## 3. Create your own Supabase project (free tier is fine)
-
-1. Sign up at https://supabase.com → **New project**.
-2. Wait for it to provision (~2 minutes).
-3. From **Project Settings → API**, copy:
-   - `Project URL` → this is your `SUPABASE_URL`
-   - `anon public` key → this is your `SUPABASE_PUBLISHABLE_KEY`
-   - `service_role` key → this is your `SUPABASE_SERVICE_ROLE_KEY` (keep secret)
-   - Project ref (the string in the URL) → `SUPABASE_PROJECT_ID`
-
-## 4. Apply the database schema to your Supabase project
-
-All migrations live in `supabase/migrations/`. Push them:
-
-```bash
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase db push
-```
-
-This creates every table, RLS policy, function, and the `evidence` storage bucket exactly like production.
-
-## 5. Get an AI provider key
-
-The app uses the Lovable AI Gateway (`https://ai.gateway.lovable.dev`). Since that key isn't exportable, point the app at **Google Gemini** directly (same underlying model, free tier available):
-
-1. Go to https://aistudio.google.com/apikey → **Create API key**.
-2. Copy the key.
-
-You will need one tiny code change (Step 7) to swap the endpoint. Or, if you have an OpenRouter / OpenAI key, use that — same OpenAI-compatible shape.
-
-## 6. Create `.env` in the project root
-
+**3. Create `.env` in the project root**
 ```env
-# --- Your own Supabase project ---
-VITE_SUPABASE_URL=https://<your-ref>.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=<your anon key>
-VITE_SUPABASE_PROJECT_ID=<your-ref>
+VITE_SUPABASE_URL=https://tycnbtycdjgwjmjfdwtm.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj
+VITE_SUPABASE_PROJECT_ID=tycnbtycdjgwjmjfdwtm
 
-SUPABASE_URL=https://<your-ref>.supabase.co
-SUPABASE_PUBLISHABLE_KEY=<your anon key>
-SUPABASE_PROJECT_ID=<your-ref>
-SUPABASE_SERVICE_ROLE_KEY=<your service_role key>
+SUPABASE_URL=https://tycnbtycdjgwjmjfdwtm.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj
+SUPABASE_PROJECT_ID=tycnbtycdjgwjmjfdwtm
 
-# --- AI ---
-# Use your Gemini key here (or OpenRouter/OpenAI key)
-LOVABLE_API_KEY=<your Gemini or OpenRouter key>
-
-# --- App secret (any random string, keep it consistent) ---
-ANVIX_SIGNAL_PEPPER=change-me-to-any-long-random-string
+ANVIX_SIGNAL_PEPPER=change-me-to-any-random-string-123
 ```
 
-## 7. Point the AI helper at your provider
+**4. Run**
+```bash
+bun run dev
+```
+Open **http://localhost:8080**.
 
-Open `src/lib/ai-gateway.server.ts`. Change the top constant:
+Your local app talks to the same Lovable Cloud database as the live site.
 
-**If using Google Gemini directly:**
+---
+
+## Option 3 — Run locally with full AI (2-minute free signup)
+
+Same as Option 2, plus a free Google Gemini key so AI works.
+
+**Extra steps after Option 2:**
+
+**a.** Go to **https://aistudio.google.com/apikey** → sign in with Google → **Create API key**. No credit card. Copy the key.
+
+**b.** Add it to `.env`:
+```env
+LOVABLE_API_KEY=<your Gemini key>
+```
+
+**c.** Open `src/lib/ai-gateway.server.ts` and change two things at the top:
+
+Change:
+```ts
+const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+```
+to:
 ```ts
 const GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 ```
 
-**If using OpenRouter:**
+And in the `fetch` call, change the header:
 ```ts
-const GATEWAY_URL = "https://openrouter.ai/api/v1/chat/completions";
+"Lovable-API-Key": key,
 ```
-
-**If using OpenAI:**
+to:
 ```ts
-const GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
-```
-And in the same file change the auth header from `"Lovable-API-Key": key` to `"Authorization": \`Bearer ${key}\``.
-
-The default model id `google/gemini-2.5-flash` works for OpenRouter. For direct Gemini use `gemini-2.5-flash`. For OpenAI use e.g. `gpt-4o-mini`.
-
-## 8. Start the app
-
-```bash
-bun run dev
+"Authorization": `Bearer ${key}`,
 ```
 
-Open **http://localhost:8080** — full app, full features, running against your own database + your own AI key. Nothing disabled.
+Also change the default model from `google/gemini-2.5-flash` to `gemini-2.5-flash` (drop the `google/` prefix for direct Gemini).
 
-## 9. Seed the ML signals (optional, matches production)
+**d.** Restart `bun run dev`. Now AI works too.
 
-```bash
-node ml/seed_global_signals.mjs
-node ml/curated_seed.mjs
-```
+Note: some **admin writes** still need `SUPABASE_SERVICE_ROLE_KEY` which you can't get. 95% of user-visible flows are fine without it. For 100% parity you'd have to spin up your own Supabase project (`supabase link` + `supabase db push` all migrations) — a much bigger project. Not worth it for a demo.
 
-## 10. Chrome extension (local)
+---
 
-1. `public/anvix-scanner-v1.0.0.zip` → unzip.
-2. Chrome → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the unzipped folder.
-3. To make it hit your local server instead of the published URL, edit `extension/background.js` and change the base URL to `http://localhost:8080`, then reload the extension.
+## Chrome extension (works in all three options)
+
+1. Find `public/anvix-scanner-v1.0.0.zip` in the project → unzip it.
+2. Chrome → `chrome://extensions` → enable **Developer mode** (top right).
+3. Click **Load unpacked** → pick the unzipped folder.
+4. Right-click any suspicious message on LinkedIn / Gmail / WhatsApp Web → **Scan with Anvix**.
+
+By default the extension calls the live URL. To point it at your local server, edit `extension/background.js` and replace the base URL with `http://localhost:8080`, then reload the extension.
 
 ---
 
 ## Troubleshooting
 
-- **`bun: command not found`** → restart terminal.
-- **Port 8080 busy** → `bun run dev -- --port 3000`.
-- **Auth errors / blank page** → re-check every `.env` value; no quotes needed.
-- **AI call returns 401** → provider key wrong, or you didn't switch the auth header in Step 7.
-- **`Missing Supabase environment variable`** → `.env` not loaded; restart `bun run dev`.
+- `bun: command not found` → restart your terminal after installing Bun.
+- Port 8080 in use → `bun run dev -- --port 3000`.
+- Blank page / auth errors → double-check `.env` values (no quotes).
+- AI 401 error → in Option 3, you didn't change the auth header in step (c).
 - **Never commit `.env`** — it's already in `.gitignore`.
 
-## Deploy to Vercel (later)
+## Deploy elsewhere?
 
-Possible but non-trivial: the project targets Cloudflare Workers today. To move to Vercel you'd switch the Vite build preset, edit `src/server.ts`, and retest server functions. Keep it on Lovable or Cloudflare Workers for the smoothest path.
+Not recommended for a demo. This project targets Cloudflare Workers via Lovable's build. Moving to Vercel needs a build-preset swap + server.ts edits + retesting. Keep it hosted on Lovable — the URL is free and permanent.
