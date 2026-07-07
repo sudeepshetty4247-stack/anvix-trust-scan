@@ -41,24 +41,59 @@ export const claimGuestInvestigation = createServerFn({ method: "POST" })
     const supabase = context.supabase;
     const userId = context.userId;
 
-    const { data: inv, error: invErr } = await supabase.from("investigations").insert({
-      user_id: userId,
-      name: data.name,
-      status: "completed" as any,
-      progress: 100,
-      trust_score: data.result.trust_score,
-      risk_category: data.result.risk_category as any,
-      best_model: data.result.model_used,
-      completed_at: new Date().toISOString(),
-    }).select("id").single();
+    const { data: inv, error: invErr } = await supabase
+      .from("investigations")
+      .insert({
+        user_id: userId,
+        name: data.name,
+        status: "completed" as any,
+        progress: 100,
+        trust_score: data.result.trust_score,
+        risk_category: data.result.risk_category as any,
+        best_model: data.result.model_used,
+        completed_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
     if (invErr) throw new Error(invErr.message);
     const invId = inv.id;
 
     // Evidence
     const evidenceRows = [
-      ...data.input.urls.map((u) => ({ investigation_id: invId, user_id: userId, kind: "url" as const, content: u, label: null, storage_path: null, mime_type: null, size_bytes: null })),
-      ...data.input.emails.map((e) => ({ investigation_id: invId, user_id: userId, kind: "text" as const, content: e, label: "email", storage_path: null, mime_type: null, size_bytes: null })),
-      ...(data.input.text ? [{ investigation_id: invId, user_id: userId, kind: "text" as const, content: data.input.text, label: "description", storage_path: null, mime_type: null, size_bytes: null }] : []),
+      ...data.input.urls.map((u) => ({
+        investigation_id: invId,
+        user_id: userId,
+        kind: "url" as const,
+        content: u,
+        label: null,
+        storage_path: null,
+        mime_type: null,
+        size_bytes: null,
+      })),
+      ...data.input.emails.map((e) => ({
+        investigation_id: invId,
+        user_id: userId,
+        kind: "text" as const,
+        content: e,
+        label: "email",
+        storage_path: null,
+        mime_type: null,
+        size_bytes: null,
+      })),
+      ...(data.input.text
+        ? [
+            {
+              investigation_id: invId,
+              user_id: userId,
+              kind: "text" as const,
+              content: data.input.text,
+              label: "description",
+              storage_path: null,
+              mime_type: null,
+              size_bytes: null,
+            },
+          ]
+        : []),
     ];
     if (evidenceRows.length) await supabase.from("evidence").insert(evidenceRows);
 
@@ -66,28 +101,38 @@ export const claimGuestInvestigation = createServerFn({ method: "POST" })
     if (data.result.verifications.length) {
       await supabase.from("verifications").insert(
         data.result.verifications.map((v: any) => ({
-          investigation_id: invId, user_id: userId,
-          category: v.category, check_name: v.check_name,
+          investigation_id: invId,
+          user_id: userId,
+          category: v.category,
+          check_name: v.check_name,
           status: (v.status ?? "pass") as any,
-          score: v.score, result: v as any, weight: 1,
-        }))
+          score: v.score,
+          result: v as any,
+          weight: 1,
+        })),
       );
     }
 
     // ML prediction
     await supabase.from("ml_predictions").insert({
-      investigation_id: invId, user_id: userId,
+      investigation_id: invId,
+      user_id: userId,
       model_used: data.result.model_used,
       prediction_score: data.result.trust_score,
       confidence: data.result.confidence,
       risk_category: data.result.risk_category as any,
-      features: { kaggle: data.result.kaggle_features, weighted: data.result.weighted_features, fraud_probability: data.result.fraud_probability } as any,
+      features: {
+        kaggle: data.result.kaggle_features,
+        weighted: data.result.weighted_features,
+        fraud_probability: data.result.fraud_probability,
+      } as any,
       feature_importance: data.result.kaggle_contributions as any,
     });
 
     // Trust report
     await supabase.from("trust_reports").insert({
-      investigation_id: invId, user_id: userId,
+      investigation_id: invId,
+      user_id: userId,
       summary: data.result.summary,
       positive_findings: data.result.positive_findings as any,
       negative_findings: data.result.negative_findings as any,
@@ -105,7 +150,9 @@ export const claimGuestInvestigation = createServerFn({ method: "POST" })
     });
 
     await supabase.from("activities").insert({
-      investigation_id: invId, user_id: userId, level: "info",
+      investigation_id: invId,
+      user_id: userId,
+      level: "info",
       message: "Investigation claimed from guest session.",
       meta: {} as any,
     });

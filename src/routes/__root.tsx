@@ -18,7 +18,9 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <div className="mono text-xs uppercase tracking-[0.2em] text-muted-foreground">404 · No case file</div>
+        <div className="mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          404 · No case file
+        </div>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">This trail leads nowhere</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The URL doesn't match any investigation, evidence, or report.
@@ -44,19 +46,29 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <div className="mono text-xs uppercase tracking-[0.2em] text-destructive">Investigation halted</div>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Something interrupted the process</h1>
+        <div className="mono text-xs uppercase tracking-[0.2em] text-destructive">
+          Investigation halted
+        </div>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+          Something interrupted the process
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The evidence is preserved. You can retry, or return home.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             Retry
           </button>
-          <a href="/" className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-accent">
+          <a
+            href="/"
+            className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
             Home
           </a>
         </div>
@@ -71,22 +83,45 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "ANVIX — Recruitment Trust & Fraud Intelligence" },
-      { name: "description", content: "One upload. One investigation. One trust score. ANVIX investigates job offers, recruiters, and companies with evidence-driven AI." },
+      {
+        name: "description",
+        content:
+          "One upload. One investigation. One trust score. ANVIX investigates job offers, recruiters, and companies with evidence-driven AI.",
+      },
       { name: "author", content: "ANVIX" },
       { property: "og:title", content: "ANVIX — Recruitment Trust & Fraud Intelligence" },
-      { property: "og:description", content: "One upload. One investigation. One trust score. ANVIX investigates job offers, recruiters, and companies with evidence-driven AI." },
+      {
+        property: "og:description",
+        content:
+          "One upload. One investigation. One trust score. ANVIX investigates job offers, recruiters, and companies with evidence-driven AI.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "ANVIX — Recruitment Trust & Fraud Intelligence" },
-      { name: "twitter:description", content: "One upload. One investigation. One trust score. ANVIX investigates job offers, recruiters, and companies with evidence-driven AI." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4b6ca58f-0924-42bb-8a97-484ff12c6e62/id-preview-f6923fbb--681d209a-6aca-434c-8980-eb804f18b427.lovable.app-1783417781081.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4b6ca58f-0924-42bb-8a97-484ff12c6e62/id-preview-f6923fbb--681d209a-6aca-434c-8980-eb804f18b427.lovable.app-1783417781081.png" },
+      {
+        name: "twitter:description",
+        content:
+          "One upload. One investigation. One trust score. ANVIX investigates job offers, recruiters, and companies with evidence-driven AI.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4b6ca58f-0924-42bb-8a97-484ff12c6e62/id-preview-f6923fbb--681d209a-6aca-434c-8980-eb804f18b427.lovable.app-1783417781081.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4b6ca58f-0924-42bb-8a97-484ff12c6e62/id-preview-f6923fbb--681d209a-6aca-434c-8980-eb804f18b427.lovable.app-1783417781081.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+      },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),

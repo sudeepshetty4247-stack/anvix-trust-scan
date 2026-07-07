@@ -1,60 +1,132 @@
+## The honest diagnosis
 
-## What we're building
+You're right on every point. Right now ANVIX is a fancy form that outputs a score — nothing a scam victim, a candidate rushing between interviews, or a recruiter would actually pull out on a Tuesday night. It doesn't _explain the crime_, it doesn't _meet the user where the evidence lives_ (screenshots, offer PDFs, forwarded emails), and 17k rows of one Kaggle dataset is a toy. This plan fixes all of that.
 
-Three tracks, delivered in one pass:
+## What ANVIX becomes
 
-### Track A — Guest mode with optional login (browser-only storage)
+**"Drop anything you got — a screenshot, an offer letter, a link, a WhatsApp text, an email you forwarded to yourself — and ANVIX will tell you exactly how the scam works, who's behind it, and what they'll ask you for next."**
 
-- Landing → **"Start Investigation" opens directly**, no auth required.
-- New guest routes (public, SSR-off): `/investigate` (create), `/investigate/live` (runs + shows progress + trust report). Guest state lives entirely in `localStorage` under `anvix:guest:current` and `anvix:guest:history` (up to 20 recent local-only runs).
-- Verification engine + scoring already runs as unauthenticated server functions — I'll add a **`runGuestInvestigation` public server fn** that accepts raw evidence in the request body (never touches DB), returns full result JSON. No DB writes for guests.
-- **"Save to history" button** on the guest trust report → opens an auth modal (email/password + Google). On sign-in, we replay the stored result into the user's DB (investigation + evidence + verifications + prediction + report rows) and redirect to `/investigations/:id`.
-- Signed-in users still get the existing `/dashboard` with their full saved history. Header shows "Sign in / Save" (guest) or the user menu (signed in).
-- **RLS unchanged** — all authenticated tables still owner-only.
+Three pillars:
 
-### Track B — Real ML model trained on Kaggle Fraudulent Job Postings
+1. **Evidence-first UX** — zero mandatory fields, just an "Add evidence" surface that accepts _whatever the user has_.
+2. **Wow triad** — the three differentiators from your answer, unified into one report.
+3. **Real ML** — bigger corpus + transformer embeddings + LLM reasoning layer.
 
-The current weighted engine stays as the deterministic baseline. Alongside it:
+---
 
-1. **Offline training pipeline** (Python, one-shot in sandbox, committed to `ml/`):
-   - Load Kaggle `fake_job_postings.csv` (17,880 rows, ~800 fraud-labeled — I'll fetch it in-sandbox).
-   - Feature engineering aligned to the app's 17 runtime features (text-derived: fraud keywords, urgency, payment, crypto, grammar; metadata-derived: has_company_logo, has_questions, telecommuting, employment_type, required_experience).
-   - Train **Logistic Regression, Random Forest, XGBoost, LightGBM**; pick best by F1 on stratified holdout.
-   - Save: `ml/metrics.json` (accuracy/precision/recall/F1/ROC-AUC per model), `ml/confusion_matrices.png`, `ml/roc_curves.png`, `ml/feature_importance.png`, `ml/model_coefficients.json` (winning model weights in a shape the TS scorer can consume).
-2. **Runtime integration** — `src/lib/scoring.ts` now has two modes:
-   - `weighted-v1` (current) — kept for interpretability / fallback.
-   - `kaggle-lr-v1` — loads `ml/model_coefficients.json` at build time, runs logistic-regression inference at request time (pure TS, edge-safe, no Python endpoint needed). Model badge and confidence reflect the real trained coefficients.
-3. Every investigation records which model was used and its real training metrics (queryable from the report).
+## Track 1 — Evidence-first conversational UX
 
-This gives the report **real accuracy/precision/recall/F1/ROC numbers** without needing to host a separate Python service.
+Replaces the current URL/email/text form with a **single drop zone + chat**:
 
-### Track C — Full DOCX report (all 8 chapters)
+- One page (`/investigate`) with a big "Add anything you have" area. Accepts:
+  - **Screenshots** of LinkedIn/WhatsApp/Instagram/email → OCR (server-side, `tesseract.js` + Gemini vision fallback for hard cases) extracts sender, company, URLs, phone, salary.
+  - **Offer letter PDF / DOCX** → parsed for letterhead, signature image, bank/UPI/crypto details, salary, joining date, HR email.
+  - **Forwarded .eml** or raw email headers → SPF/DKIM/DMARC verdict, return-path mismatch, display-name spoofing.
+  - **Just a URL, company name, or recruiter name** → we enrich everything server-side.
+  - **Plain text** paste (WhatsApp thread, JD copy).
+- After the first drop, an inline chat prompts _only_ what would raise confidence: "Got the recruiter's LinkedIn? Drop it." "Any bank account they asked you to pay?" — never a wall of required fields. Skippable.
+- Live "Confidence meter" fills as evidence is added — user sees investigation getting stronger with each drop.
+- Guest can do everything on-screen. **Download PDF report → sign-in modal → download.** Same gate for "Save to history".
 
-Generated with `docx-js` per the drafting skill, saved to `/mnt/documents/ANVIX_Project_Report.docx`. Content driven from:
-- Real architecture diagrams (component, DFD, use-case, activity, ER) rendered as PNGs with matplotlib/graphviz.
-- Real screenshots of the running app (landing, guest flow, live investigation, trust report, dashboard) via Playwright.
-- Real training metrics from Track B (`metrics.json` → tables + charts).
-- All 40+ subsections from your TOC populated with project-specific content (not lorem ipsum).
+---
 
-Delivered as `<presentation-artifact>` you can download.
+## Track 2 — The wow triad (all three, unified)
 
-## Order of work
+Three modules run in parallel on every investigation and feed into one narrative report.
 
-1. Guest-mode routes + `localStorage` state + public server fn + "Save to history" claim flow.
-2. Kaggle training pipeline in `/tmp` → export `ml/model_coefficients.json` + metrics artifacts into repo.
-3. TS logistic-regression scorer + wire into pipeline.
-4. Verify: run guest investigation end-to-end via Playwright, confirm real model score matches Python offline prediction on same features.
-5. Capture screenshots + generate architecture diagrams.
-6. Generate DOCX, QA every page as images, deliver.
+### 2a. Recruiter Identity Graph
 
-## Technical notes
+- Extract every identity signal from the evidence: name, email, phone, LinkedIn URL, company, profile photo.
+- Build a graph node per identity, edges per shared attribute (same phone across 3 recruiters = red edge).
+- Cross-check against:
+  - Prior ANVIX investigations (anonymized global signal DB — new table `global_signals`, no PII, hashed identifiers).
+  - Public breach indicators (HaveIBeenPwned k-anon API for email).
+  - Reverse-image on the profile photo (Gemini vision: "does this face appear in known-scam corpora / stock photo sites").
+- Output: _"This recruiter's phone number appeared in 4 prior flagged investigations under 2 different names."_
 
-- **Kaggle dataset access**: I'll fetch it in-sandbox from a public mirror (the dataset is CC0). If the mirror is blocked, I'll fall back to reconstructing a labeled subset from Kaggle's published API sample; if that also fails, I'll pause and ask before continuing Track B.
-- **Model coefficients bundled in the app**: ~20KB JSON, no runtime training, no Python host required. This is a legitimate production deployment pattern (same approach Cloudflare Workers AI uses for small classical models).
-- **Guest → account claim**: single server fn `claimGuestInvestigation({ snapshot })` that runs inside `requireSupabaseAuth`, inserts investigation + child rows in a transaction, returns the new investigation id.
-- **No RLS or schema changes needed** — guest path bypasses DB entirely; claim path writes as the newly-authenticated user.
-- **`.docx` report**: ~50–60 pages, matches your TOC exactly (Chapters 1–8 + References), uses your project's real name/architecture/metrics.
+### 2b. Offer Letter Forensics
 
-## Confirm to proceed
+- PDF metadata (author, producer, creation tool, modification history — tampering giveaway).
+- Signature/logo image lifted from PDF → perceptual hash → matched against known legit company assets (built a small library at build time for top 500 employers).
+- Salary vs. market band check (LLM with role + city → outputs plausibility band; extreme outliers flagged).
+- Payment method extraction — any personal bank account, UPI, or crypto wallet in an offer letter is an instant red flag with explanation.
+- Template reuse detector — Levenshtein against a corpus of known scam templates.
 
-Reply "go" and I'll execute all three tracks in order. Total time: substantial (training + report generation are the long steps); I'll batch aggressively and report back with the downloadable DOCX + a working guest flow.
+### 2c. Live Scam Playbook Match
+
+- A curated library of ~40 known scam scripts (fee-for-laptop, crypto-payroll onboarding, WhatsApp-only recruiter, fake HR portal, task-scam pyramid, visa-processing fee, etc.), each with the ordered steps scammers take.
+- Match user's evidence against the library using embedding similarity + LLM classification.
+- Output the matched playbook with a **"what they'll ask you next"** prediction — this is the emotional gut-punch that makes users trust the tool: _"You're at step 3 of the 'Equipment Advance' scam. Next they'll ask you to pay ₹12k–₹45k for a company laptop and promise reimbursement in the first paycheck. Do not send money."_
+
+All three modules feed the trust report; each finding is cited to the specific evidence item.
+
+---
+
+## Track 3 — Real ML upgrade
+
+Move beyond the 17k-row Kaggle baseline.
+
+### 3a. Bigger, better corpus
+
+- Kaggle EMSCAD (17,880) — kept as base.
+- **Indeed / LinkedIn scam-report scrapes** — public archives + FTC Consumer Sentinel job-scam narratives.
+- **BBB scam-tracker** job-fraud category exports.
+- **Our own labeled synthetic set** — generate 20k additional edge cases with an LLM under a fixed rubric (crypto payroll, task scams, visa fee, courier-package scam) and hand-audit a stratified sample.
+- Target: **~100k rows, ~15k fraud-labeled**, stratified by scam family.
+
+### 3b. Transformer text encoder + tabular ensemble
+
+- Fine-tune **distilbert-base-uncased** (or MiniLM) on the corpus for `P(fraud | job_text)`.
+- Export to **ONNX**, quantize to int8 (~30–50 MB), served from a small Python endpoint (Cloudflare Worker for tabular, one lightweight Python service — you already accepted external Python ML API in the original scope).
+- LightGBM on top of `[transformer_embedding, tabular_17_features, forensics_features]` — this is the production model.
+- Report the honest before/after: current LR (ROC-AUC 0.76) → new ensemble (target ROC-AUC 0.92+).
+
+### 3c. LLM reasoning layer
+
+- Gemini 2.5 Flash gets `{evidence, ML score, forensics findings, playbook match}` and produces the _narrative_ explanation and the **"what they'll ask next"** prediction.
+- Structured output so the UI can render each claim with its evidence citation.
+
+### 3d. Everything published in the report
+
+Chapter 4 (Methodology), 5 (Implementation), and 7 (Results) of the DOCX get rewritten with the new dataset stats, new model comparisons (LR vs RF vs XGBoost vs LightGBM vs DistilBERT-only vs Ensemble), new confusion matrices, new ROC curves, new SHAP feature-importance plots.
+
+---
+
+## Track 4 — Report download gate
+
+- Download button visible to guests.
+- Click → sign-in modal (email/password + Google).
+- On sign-in: the current guest investigation is claimed into their account (already built), then the PDF is generated server-side and streamed back.
+- PDF (not just DOCX) — branded ANVIX report with the trust score, evidence gallery, identity graph, forensics findings, playbook match, and citation list. Same content DOCX for the university report deliverable.
+
+---
+
+## Technical section
+
+**New/changed files (high level)**
+
+- `src/routes/investigate.tsx` — rewrite to evidence-drop + chat.
+- `src/components/evidence/*` — `DropZone`, `ScreenshotOCR`, `PDFPreview`, `EmailHeaderParser`, `EvidenceChat`.
+- `src/lib/ocr.functions.ts` — Tesseract wasm + Gemini vision fallback.
+- `src/lib/offer-forensics.functions.ts` — pdf-lib parse, image hash, metadata inspection.
+- `src/lib/identity-graph.functions.ts` — build/query the graph.
+- `src/lib/playbook-match.functions.ts` — embedding + LLM classification.
+- `src/lib/ml-ensemble.functions.ts` — calls the Python inference endpoint; falls back to Kaggle-LR bundled model if endpoint down.
+- `src/lib/report-pdf.functions.ts` — server-rendered PDF via `@react-pdf/renderer` (edge-safe).
+- `ml/train_ensemble.py`, `ml/build_corpus.py`, `ml/playbook_library.json`, `ml/onnx/model.onnx`.
+- Python inference service (FastAPI, minimal) — one endpoint `/predict`, deployed anywhere the user prefers (Fly.io/Render/Cloud Run). If user doesn't want a Python host, we degrade to the bundled LR + LLM reasoning (still a large upgrade).
+- New tables: `global_signals` (hashed phone/email/domain, occurrence count, first_seen, last_seen — no PII), `evidence_files` (storage_path, kind, extracted JSON), `playbook_matches`. All with RLS + GRANTs.
+- `evidence` bucket already exists — used for screenshots + offer PDFs.
+
+**Ordering**
+
+1. Evidence-first UX + OCR + PDF/email parsing + download-gate. (User-visible, biggest immediate impact.)
+2. Wow triad modules 2a/2b/2c — each ships behind a "beta" tag as it comes online.
+3. ML corpus build + ensemble training + ONNX export + Python inference endpoint.
+4. Rewrite the DOCX/PDF report with the real new numbers, ship the university-grade deliverable.
+
+**Open confirmation before I start:**
+
+- Python inference host — happy for me to spin up a free-tier Fly.io service and give you the deploy command, or do you want inference to stay bundled (LR only) and skip the transformer? Everything else in the plan works either way.
+
+Reply "go" and I'll execute Track 1 first (biggest UX shift), report back, then continue through 2 → 3 → 4.

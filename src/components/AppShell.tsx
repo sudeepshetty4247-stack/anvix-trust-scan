@@ -4,7 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck, LayoutDashboard, LogOut, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
-export function AppShell({ children, onNewInvestigation }: { children: ReactNode; onNewInvestigation?: () => void }) {
+export function AppShell({
+  children,
+  onNewInvestigation,
+}: {
+  children: ReactNode;
+  onNewInvestigation?: () => void;
+}) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -27,7 +33,13 @@ export function AppShell({ children, onNewInvestigation }: { children: ReactNode
         </div>
 
         <nav className="flex-1 space-y-1 px-3">
-          <NavItem to="/dashboard" active={pathname === "/dashboard"} icon={<LayoutDashboard className="h-4 w-4" />}>Dashboard</NavItem>
+          <NavItem
+            to="/dashboard"
+            active={pathname === "/dashboard"}
+            icon={<LayoutDashboard className="h-4 w-4" />}
+          >
+            Dashboard
+          </NavItem>
           {onNewInvestigation && (
             <button
               onClick={onNewInvestigation}
@@ -53,12 +65,24 @@ export function AppShell({ children, onNewInvestigation }: { children: ReactNode
   );
 }
 
-function NavItem({ to, active, icon, children }: { to: string; active?: boolean; icon: ReactNode; children: ReactNode }) {
+function NavItem({
+  to,
+  active,
+  icon,
+  children,
+}: {
+  to: string;
+  active?: boolean;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <Link
       to={to}
       className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-        active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+        active
+          ? "bg-accent text-foreground"
+          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
       }`}
     >
       {icon} {children}

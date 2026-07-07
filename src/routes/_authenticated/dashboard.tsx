@@ -47,15 +47,37 @@ function Dashboard() {
         {hasAny && (
           <>
             <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard icon={FolderOpen} label="Total investigations" value={String(stats.data?.totalInvestigations ?? investigations.length)} />
-              <StatCard icon={FileSearch} label="Evidence collected" value={String(stats.data?.evidenceCollected ?? 0)} />
-              <StatCard icon={TrendingUp} label="Average trust score" value={stats.data?.averageTrustScore != null ? `${stats.data.averageTrustScore}/100` : "—"} />
-              <StatCard icon={ShieldCheck} label="Completed" value={String(investigations.filter((i) => i.status === "completed").length)} />
+              <StatCard
+                icon={FolderOpen}
+                label="Total investigations"
+                value={String(stats.data?.totalInvestigations ?? investigations.length)}
+              />
+              <StatCard
+                icon={FileSearch}
+                label="Evidence collected"
+                value={String(stats.data?.evidenceCollected ?? 0)}
+              />
+              <StatCard
+                icon={TrendingUp}
+                label="Average trust score"
+                value={
+                  stats.data?.averageTrustScore != null
+                    ? `${stats.data.averageTrustScore}/100`
+                    : "—"
+                }
+              />
+              <StatCard
+                icon={ShieldCheck}
+                label="Completed"
+                value={String(investigations.filter((i) => i.status === "completed").length)}
+              />
             </div>
 
             <div className="mt-10">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Recent cases</h2>
+                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Recent cases
+                </h2>
               </div>
               <div className="glass overflow-hidden rounded-xl">
                 {investigations.map((inv) => (
@@ -75,7 +97,10 @@ function Dashboard() {
                     </div>
                     <div className="ml-4 flex items-center gap-4">
                       {inv.trust_score != null && inv.risk_category && (
-                        <TrustBadge score={Number(inv.trust_score)} category={inv.risk_category as RiskCategory} />
+                        <TrustBadge
+                          score={Number(inv.trust_score)}
+                          category={inv.risk_category as RiskCategory}
+                        />
                       )}
                       <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                     </div>
@@ -108,7 +133,8 @@ function EmptyState({ onStart }: { onStart: () => void }) {
       </div>
       <h2 className="mt-6 text-2xl font-semibold tracking-tight">Welcome to ANVIX</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        No investigations yet. Drop evidence — a job URL, offer letter, recruiter email, screenshot — and ANVIX takes it from there.
+        No investigations yet. Drop evidence — a job URL, offer letter, recruiter email, screenshot
+        — and ANVIX takes it from there.
       </p>
       <button
         onClick={onStart}
@@ -125,7 +151,9 @@ function StatCard({ icon: Icon, label, value }: { icon: any; label: string; valu
     <div className="glass rounded-xl p-4">
       <Icon className="h-4 w-4 text-primary" />
       <div className="mt-3 text-2xl font-semibold tracking-tight">{value}</div>
-      <div className="mono mt-1 text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mono mt-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
     </div>
   );
 }
@@ -141,7 +169,9 @@ export function StatusPill({ status }: { status: string }) {
     failed: "bg-destructive/15 text-destructive",
   };
   return (
-    <span className={`mono rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${map[status] ?? "bg-muted text-muted-foreground"}`}>
+    <span
+      className={`mono rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${map[status] ?? "bg-muted text-muted-foreground"}`}
+    >
       {status}
     </span>
   );
@@ -151,7 +181,9 @@ export function TrustBadge({ score, category }: { score: number; category: RiskC
   const meta = RISK_META[category];
   return (
     <div className="flex items-center gap-2">
-      <div className="mono text-lg font-semibold tabular-nums" style={{ color: meta.color }}>{score}</div>
+      <div className="mono text-lg font-semibold tabular-nums" style={{ color: meta.color }}>
+        {score}
+      </div>
       <div className="text-xs text-muted-foreground">{meta.label}</div>
     </div>
   );

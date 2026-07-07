@@ -27,7 +27,8 @@ function AuthPage() {
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email, password,
+          email,
+          password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
@@ -46,7 +47,9 @@ function AuthPage() {
 
   async function handleGoogle() {
     setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
     if (result.error) {
       toast.error(result.error.message || "Google sign-in failed");
       setBusy(false);
@@ -70,7 +73,9 @@ function AuthPage() {
           {mode === "signin" ? "Sign in to your cases" : "Create your investigator account"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Continue your investigations." : "Every case you run is private and yours."}
+          {mode === "signin"
+            ? "Continue your investigations."
+            : "Every case you run is private and yours."}
         </p>
 
         <button
@@ -78,7 +83,12 @@ function AuthPage() {
           disabled={busy}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-60"
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.23 1.4-1.7 4.1-5.35 4.1-3.22 0-5.85-2.66-5.85-5.95S8.78 6.5 12 6.5c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 3.9 14.55 3 12 3 6.98 3 3 7 3 12s3.98 9 9 9c5.2 0 8.65-3.65 8.65-8.8 0-.6-.07-1.05-.15-1.5z"/></svg>
+          <svg className="h-4 w-4" viewBox="0 0 24 24">
+            <path
+              fill="#fff"
+              d="M21.35 11.1H12v3.2h5.35c-.23 1.4-1.7 4.1-5.35 4.1-3.22 0-5.85-2.66-5.85-5.95S8.78 6.5 12 6.5c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 3.9 14.55 3 12 3 6.98 3 3 7 3 12s3.98 9 9 9c5.2 0 8.65-3.65 8.65-8.8 0-.6-.07-1.05-.15-1.5z"
+            />
+          </svg>
           Continue with Google
         </button>
 
@@ -88,17 +98,25 @@ function AuthPage() {
 
         <form onSubmit={handleEmail} className="space-y-3">
           <input
-            type="email" required placeholder="you@work.com" value={email}
+            type="email"
+            required
+            placeholder="you@work.com"
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-md border border-input bg-surface px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/60"
           />
           <input
-            type="password" required minLength={6} placeholder="Password" value={password}
+            type="password"
+            required
+            minLength={6}
+            placeholder="Password"
+            value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-md border border-input bg-surface px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/60"
           />
           <button
-            type="submit" disabled={busy}
+            type="submit"
+            disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
