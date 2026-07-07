@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedInvestigationsIdRouteImport } from './routes/_authenticated/investigations.$id'
+import { Route as ApiPublicCardSlugRouteImport } from './routes/api.public.card.$slug'
 
 const InvestigateRoute = InvestigateRouteImport.update({
   id: '/investigate',
@@ -46,6 +47,11 @@ const AuthenticatedInvestigationsIdRoute =
     path: '/investigations/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicCardSlugRoute = ApiPublicCardSlugRouteImport.update({
+  id: '/api/public/card/$slug',
+  path: '/api/public/card/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/investigate': typeof InvestigateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
+  '/api/public/card/$slug': typeof ApiPublicCardSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/investigate': typeof InvestigateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
+  '/api/public/card/$slug': typeof ApiPublicCardSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/investigate': typeof InvestigateRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
+  '/api/public/card/$slug': typeof ApiPublicCardSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -78,8 +87,15 @@ export interface FileRouteTypes {
     | '/investigate'
     | '/dashboard'
     | '/investigations/$id'
+    | '/api/public/card/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/investigate' | '/dashboard' | '/investigations/$id'
+  to:
+    | '/'
+    | '/auth'
+    | '/investigate'
+    | '/dashboard'
+    | '/investigations/$id'
+    | '/api/public/card/$slug'
   id:
     | '__root__'
     | '/'
@@ -88,6 +104,7 @@ export interface FileRouteTypes {
     | '/investigate'
     | '/_authenticated/dashboard'
     | '/_authenticated/investigations/$id'
+    | '/api/public/card/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -95,6 +112,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   InvestigateRoute: typeof InvestigateRoute
+  ApiPublicCardSlugRoute: typeof ApiPublicCardSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -141,6 +159,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvestigationsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/card/$slug': {
+      id: '/api/public/card/$slug'
+      path: '/api/public/card/$slug'
+      fullPath: '/api/public/card/$slug'
+      preLoaderRoute: typeof ApiPublicCardSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +187,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   InvestigateRoute: InvestigateRoute,
+  ApiPublicCardSlugRoute: ApiPublicCardSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
