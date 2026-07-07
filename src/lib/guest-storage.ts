@@ -45,9 +45,16 @@ const safe = <T>(fn: () => T, fallback: T): T => {
 
 export function saveGuestCurrent(rec: GuestRecord) {
   if (typeof window === "undefined") return;
-  safe(() => localStorage.setItem(CURRENT, JSON.stringify(rec)), undefined);
+  const slim: GuestRecord = {
+    ...rec,
+    input: {
+      ...rec.input,
+      evidence: rec.input.evidence.map(({ pdf_base64, ...e }) => e),
+    },
+  };
+  safe(() => localStorage.setItem(CURRENT, JSON.stringify(slim)), undefined);
   const hist = readGuestHistory();
-  const next = [rec, ...hist.filter((h) => h.id !== rec.id)].slice(0, MAX_HISTORY);
+  const next = [slim, ...hist.filter((h) => h.id !== slim.id)].slice(0, MAX_HISTORY);
   safe(() => localStorage.setItem(HISTORY, JSON.stringify(next)), undefined);
 }
 
