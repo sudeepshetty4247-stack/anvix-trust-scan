@@ -162,7 +162,7 @@ export async function generateCybercrimeFIRPDF(inputs: FIRInputs): Promise<Uint8
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const ctx: Ctx = { doc, page: doc.addPage([PAGE_W, PAGE_H]), y: PAGE_H - M, font, bold };
+  const ctx: Ctx = { doc, page: patchPage(doc.addPage([PAGE_W, PAGE_H])), y: PAGE_H - M, font, bold };
 
   // Header
   ctx.page.drawText("ANVIX", { x: M, y: PAGE_H - 30, size: 12, font: bold, color: ACCENT });
