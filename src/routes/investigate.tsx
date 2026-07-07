@@ -415,7 +415,9 @@ function GuestInvestigate() {
     setCaseName("");
   };
 
-  const requireAuth = async (intent: "save" | "download"): Promise<boolean> => {
+  const requireAuth = async (intent: "save" | "download", trustKnownAuth = false): Promise<boolean> => {
+    if (trustKnownAuth && isAuthed) return true;
+
     const { data: userData } = await supabase.auth.getUser();
     if (userData.user) {
       setIsAuthed(true);
@@ -433,13 +435,13 @@ function GuestInvestigate() {
     return false;
   };
 
-  const doSave = async () => {
+  const doSave = async (trustKnownAuth = false) => {
     if (!record) return;
     if (savedInvestigationId) {
       toast.success("Already saved to your history");
       return;
     }
-    if (!(await requireAuth("save"))) return;
+    if (!(await requireAuth("save", trustKnownAuth))) return;
     setClaiming(true);
     try {
       const { id } = await claimFn({
@@ -465,9 +467,9 @@ function GuestInvestigate() {
     }
   };
 
-  const doDownload = async () => {
+  const doDownload = async (trustKnownAuth = false) => {
     if (!record) return;
-    if (!(await requireAuth("download"))) return;
+    if (!(await requireAuth("download", trustKnownAuth))) return;
     setDownloading(true);
     try {
       const bytes = await generateReportPDF(record);
@@ -696,7 +698,7 @@ function GuestInvestigate() {
             const i = authOpen;
             setIsAuthed(true);
             setAuthOpen(null);
-            setTimeout(() => (i === "download" ? doDownload() : doSave()), 200);
+            setTimeout(() => (i === "download" ? doDownload(true) : doSave(true)), 200);
           }}
         />
       )}
