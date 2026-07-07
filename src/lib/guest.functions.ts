@@ -506,6 +506,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       verifications_summary,
       community_signals: communitySignals,
       live_verification: liveVerification,
+      confidence_band,
       model_metadata: {
         trained_on: KAGGLE_MODEL.trained_on,
         n_rows: KAGGLE_MODEL.n_rows,
