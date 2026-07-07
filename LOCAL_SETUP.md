@@ -1,53 +1,44 @@
 # ANVIX — Complete Local Setup Guide
 
-Zero-assumption, step-by-step instructions to clone ANVIX and run it on your own laptop (Windows / macOS / Linux). If a fresh laptop follows this doc top-to-bottom, ANVIX will be running at `http://localhost:3000` in under 10 minutes.
+Zero-assumption, step-by-step instructions to clone ANVIX and run it on your laptop (Windows / macOS / Linux). Follow this top-to-bottom and the app will be running at **http://localhost:5173** in under 10 minutes — identical to the Lovable preview.
 
 ---
 
-## 1. Prerequisites — install these first
+## 1. Prerequisites
 
-| Tool | Why | Check it works |
+| Tool | Why | Verify |
 |---|---|---|
 | **Node.js 20+ (LTS)** | JavaScript runtime | `node -v` |
-| **Bun** (recommended) | Fast package manager the project uses | `bun -v` |
-| **Git** | To clone the repo | `git -v` |
-| **VS Code** (optional) | Editor | — |
-| A modern browser | To open the app | — |
+| **Bun** (recommended) | Fast package manager | `bun -v` |
+| **Git** | Clone the repo | `git -v` |
+| Modern browser | Open the app | — |
 
-**Install Node.js:** https://nodejs.org/en/download (pick the LTS installer).
+Install:
+- **Node.js** → https://nodejs.org/en/download (LTS installer)
+- **Bun**
+  - macOS / Linux: `curl -fsSL https://bun.sh/install | bash`
+  - Windows (PowerShell): `powershell -c "irm bun.sh/install.ps1 | iex"`
+  - Restart your terminal, then `bun -v`
+- **Git** → https://git-scm.com/downloads
 
-**Install Bun:**
-- macOS / Linux:
-  ```bash
-  curl -fsSL https://bun.sh/install | bash
-  ```
-- Windows (PowerShell):
-  ```powershell
-  powershell -c "irm bun.sh/install.ps1 | iex"
-  ```
-- Restart your terminal after installing, then verify with `bun -v`.
-
-**Install Git:** https://git-scm.com/downloads
-
-> If you don't want to install Bun, `npm` (bundled with Node.js) works too — just swap `bun` for `npm run` in every command.
+> No Bun? `npm` (bundled with Node) works — replace every `bun` with `npm run`.
 
 ---
 
 ## 2. Get the code
 
-**Option A — clone from GitHub** (recommended; requires the project connected to GitHub in the Lovable editor first):
+**Option A — GitHub (recommended)**
+
+In the Lovable editor: bottom-left **+** menu → **GitHub** → **Connect project** → authorize → **Create Repository**. Copy the URL, then:
 
 ```bash
 git clone <your-repo-url>
 cd anvix-trust-scan
 ```
 
-To connect the project to GitHub: in the Lovable editor, click the **+** menu (bottom-left of the chat) → **GitHub** → **Connect project** → authorize → **Create Repository**. Then copy the repo URL.
+**Option B — Download ZIP**
 
-**Option B — download a ZIP** from the Lovable code editor:
-1. Open the Lovable code editor
-2. Click **Download codebase** at the bottom of the file tree
-3. Unzip, then `cd` into the folder
+Lovable editor → **Download codebase** at the bottom of the file tree → unzip → `cd` into the folder.
 
 ---
 
@@ -55,15 +46,13 @@ To connect the project to GitHub: in the Lovable editor, click the **+** menu (b
 
 ```bash
 bun install
-# or, if you're using npm:
-npm install
+# or: npm install
 ```
 
-Expected time: 30–90 seconds.
+Takes 30–90 seconds. If it fails:
 
-**If install fails:**
 ```bash
-rm -rf node_modules bun.lockb   # or "del /s /q node_modules" on Windows
+rm -rf node_modules bun.lockb   # Windows: rmdir /s /q node_modules
 bun install
 ```
 
@@ -71,78 +60,95 @@ bun install
 
 ## 4. Create your `.env` file
 
-Create a file named `.env` in the project root and paste this block:
+Create a file named exactly `.env` in the project root and paste:
 
 ```bash
-# --- Client-side (safe to commit — publishable keys only) ---
+# --- Client (publishable — safe to commit) ---
 VITE_SUPABASE_URL="https://tycnbtycdjgwjmjfdwtm.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj"
 VITE_SUPABASE_PROJECT_ID="tycnbtycdjgwjmjfdwtm"
 
-# --- Server-side (same values, needed by server functions) ---
+# --- Server (same values, needed by server functions) ---
 SUPABASE_URL="https://tycnbtycdjgwjmjfdwtm.supabase.co"
 SUPABASE_PUBLISHABLE_KEY="sb_publishable_SzeSzI_jL5nofnzd92Ds4A_jD4appqj"
 SUPABASE_PROJECT_ID="tycnbtycdjgwjmjfdwtm"
 
-# --- Server-only secrets (optional — see table below) ---
-LOVABLE_API_KEY=""             # required for AI features
+# --- Server-only secrets ---
+LOVABLE_API_KEY=""             # required for AI features (see step 5)
 ANVIX_SIGNAL_PEPPER=""         # any random 32+ char string
-# SUPABASE_SERVICE_ROLE_KEY=""  # not available on Lovable Cloud — leave empty
 ```
 
-### Which secret does what?
+| Env var | Purpose | If missing |
+|---|---|---|
+| `VITE_SUPABASE_*` | Client Supabase connection | App won't start |
+| `SUPABASE_*` | Server functions (SSR) | Server calls fail |
+| `LOVABLE_API_KEY` | Ask ANVIX, Trap-Reply, AI report explanations | AI features return 401; score still computes |
+| `ANVIX_SIGNAL_PEPPER` | Hashing shared threat intel | Global-signal writes fail silently |
 
-| Env var | Required for | Where to get it | If missing… |
-|---|---|---|---|
-| `VITE_SUPABASE_URL` | everything | already filled above | app won't start |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | everything | already filled above | app won't start |
-| `VITE_SUPABASE_PROJECT_ID` | everything | already filled above | app won't start |
-| `SUPABASE_URL` / `_PUBLISHABLE_KEY` / `_PROJECT_ID` | server functions (SSR) | same values as `VITE_*` | server functions fail |
-| `LOVABLE_API_KEY` | Ask ANVIX, trap-reply, AI trust-report explanations | Lovable editor → project Settings (auto-provisioned) | AI features return an error; the score itself still works |
-| `ANVIX_SIGNAL_PEPPER` | Hashing shared threat intel (`global_signals`) | any random string; generate with `openssl rand -hex 32` | global-signal writes may fail silently |
-| `SUPABASE_SERVICE_ROLE_KEY` | Admin-only writes (very rare in this app) | not exposed on Lovable Cloud | skip — not needed for normal local use |
-
-> The `VITE_*` values are **publishable** keys. RLS still protects every table, so committing them is safe.
+> `SUPABASE_SERVICE_ROLE_KEY` is **not** exposed on Lovable Cloud — leave it out. The app doesn't need it locally.
 
 ---
 
-## 5. Start the dev server
+## 5. Get your `LOVABLE_API_KEY` (the only AI key you need)
+
+ANVIX calls the **Lovable AI Gateway**, which internally routes to Gemini / OpenAI / other models. You do **not** need a separate Gemini or OpenAI API key.
+
+1. Open your project in the Lovable editor.
+2. Click **Cloud** (top bar) → **Settings** → **Secrets**.
+3. Find `LOVABLE_API_KEY` in the list.
+4. Click the **⋯** menu → **Rotate** → **Copy** the newly shown value.
+5. Paste it into `.env` between the quotes on the `LOVABLE_API_KEY=""` line.
+6. Save the file.
+
+For `ANVIX_SIGNAL_PEPPER`, generate any random string:
+
+```bash
+openssl rand -hex 32
+# or on Windows PowerShell:
+[Convert]::ToHexString((1..32 | %{[byte](Get-Random -Max 256)}))
+```
+
+Paste the output into `ANVIX_SIGNAL_PEPPER=""`.
+
+---
+
+## 6. Start the dev server
 
 ```bash
 bun dev
 # or: npm run dev
 ```
 
-Open **http://localhost:3000** in your browser. You should see the ANVIX landing page.
+Open **http://localhost:5173** in your browser. The ANVIX landing page loads.
+
+> The Lovable preview URL and your localhost run share the **same** database, auth, and stored investigations — sign in with the same account on both.
 
 ---
 
-## 6. First-run smoke test (make sure it actually works)
+## 7. Smoke test (60 seconds)
 
-1. Landing page loads → click **Get started** or go to `/auth`.
-2. Sign up with **email + password** (fastest path locally — see the Google note in section 7).
+1. Landing page loads → click **Get started** (routes to `/auth`).
+2. Sign up with **email + password** (Google note in step 8).
 3. You land on `/dashboard`.
-4. Click **New investigation**, paste a suspicious message (e.g. a fake job offer with a Gmail recruiter and a payment request), and hit **Run investigation**.
-5. Watch the activity log stream live and the progress bar climb — a Trust Score appears within 10–30 seconds.
-6. Try **Ask ANVIX** at `/ask` (needs `LOVABLE_API_KEY`).
+4. Click **New investigation** → paste a suspicious message → **Run investigation**.
+5. Watch the activity log stream live; a Trust Score appears in 10–30 seconds.
+6. Open `/ask` → ask ANVIX anything → you get a streaming answer.
 
-If all six steps pass, your local setup is healthy.
-
----
-
-## 7. Google sign-in on localhost
-
-Managed Google OAuth is pre-configured for the deployed URL, not `http://localhost:3000`.
-
-**Simplest fix:** use email + password locally.
-
-**If you really want Google locally:** in the Lovable editor open **Cloud → Users → Auth Settings → Google** and add `http://localhost:3000` to the list of authorized redirect origins. (Custom OAuth clients need the same URL added in the Google Cloud Console.)
+All six pass → your setup is healthy.
 
 ---
 
-## 8. (Optional) Retrain the ML model
+## 8. Google sign-in on localhost
 
-The trained model lives in `ml/`. Coefficients are already exported to JSON and shipped with the app, so you never *need* to retrain — but if you want to:
+The managed Google OAuth client is registered for the deployed domain, not `http://localhost:5173`. Simplest fix: **use email + password locally**. Everything else works identically.
+
+If you must have Google locally, open the Lovable editor → **Cloud → Users → Auth Settings → Google** and add `http://localhost:5173` to authorized redirect origins.
+
+---
+
+## 9. (Optional) Retrain the ML model
+
+Coefficients are already exported to JSON and shipped with the app. To retrain:
 
 ```bash
 cd ml
@@ -150,57 +156,59 @@ pip install scikit-learn pandas numpy
 python train_ensemble.py
 ```
 
-This regenerates `model_coefficients.json`, `forest_model.json`, and `metrics.json`. Restart `bun dev` afterwards so the new coefficients are loaded.
-
-You'll also need the training dataset (Kaggle *Fake Job Postings* — EMSCAD). Place it as `ml/fake_job_postings.csv` before running the script.
+This regenerates `model_coefficients.json`, `forest_model.json`, `metrics.json`. Restart `bun dev` afterwards. Training needs the Kaggle *Fake Job Postings* (EMSCAD) dataset at `ml/fake_job_postings.csv`.
 
 ---
 
-## 9. Useful scripts
+## 10. Useful scripts
 
 | Command | What it does |
 |---|---|
-| `bun dev` | Dev server with hot reload (default port 3000) |
+| `bun dev` | Dev server with hot reload (port 5173) |
 | `bun run build` | Production build |
-| `bun run preview` | Serve the production build locally |
-| `bun run lint` | Run ESLint |
-| `bun run format` | Format everything with Prettier |
+| `bun run preview` | Serve the production build |
+| `bun run lint` | ESLint |
+| `bun run format` | Prettier |
 
 ---
 
-## 10. Common errors + fixes
+## 11. Common errors → fixes
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Failed to resolve import "..."` | Dependencies not installed | `bun install` again |
-| `EADDRINUSE: port 3000` | Another app is on port 3000 | `PORT=3001 bun dev` (or kill the other process) |
-| Blank page after sign-in | Stale session in localStorage | Open DevTools → Application → Local Storage → clear the `sb-*` keys → hard-refresh |
-| AI features return 401 / "unauthorized" | `LOVABLE_API_KEY` missing or invalid | Fill it in `.env`, restart dev server |
-| `Expected 3 parts in JWT; got 1` | Wrong Supabase key in a `VITE_*` var | Make sure it starts with `sb_publishable_` — never paste the service-role key into a `VITE_*` var |
-| Windows: `bun` not recognized | PATH not refreshed | Close and reopen the terminal, or reboot |
-| `.env` values ignored | File in wrong location or wrong name | Must be exactly `.env` in the **project root**, not `.env.txt` |
-| Realtime activity log not updating | Ad-blocker blocking WebSockets | Whitelist `*.supabase.co` |
+| `Failed to resolve import "..."` | Deps not installed | `bun install` again |
+| `EADDRINUSE: port 5173` | Something else on 5173 | `PORT=5174 bun dev` |
+| Blank page after sign-in | Stale session | DevTools → Application → Local Storage → clear `sb-*` keys → hard-refresh |
+| AI features return 401 / "unauthorized" | `LOVABLE_API_KEY` missing/invalid | Redo step 5, restart `bun dev` |
+| `Expected 3 parts in JWT; got 1` | Wrong Supabase key in `VITE_*` | Value must start with `sb_publishable_` |
+| Windows: `bun` not recognized | PATH not refreshed | Close + reopen terminal, or reboot |
+| `.env` values ignored | Wrong filename/location | Must be exactly `.env` in project root (not `.env.txt`) |
+| Realtime activity log frozen | Ad-blocker blocking WebSockets | Whitelist `*.supabase.co` |
 
 ---
 
-## 11. Architecture / codebase tour
+## 12. Codebase tour
 
-For a full walkthrough of the folders, database, scoring math, ML pipeline, and every route — see **`PROJECT_WALKTHROUGH.md`** in the repo root. That's the doc to skim before your lecture.
-
----
-
-## 12. Pushing your local changes back to Lovable
-
-- **If you cloned from GitHub:** normal Git workflow.
-  ```bash
-  git add .
-  git commit -m "your changes"
-  git push
-  ```
-  Lovable's GitHub sync is bidirectional — your commits appear in the Lovable editor within seconds.
-
-- **If you downloaded a ZIP:** you can't push back until you connect the project to GitHub first. Do that (Lovable editor → **+** → GitHub → Connect project), then `git clone` the new repo and copy your edits over.
+See **`PROJECT_WALKTHROUGH.md`** for folders, database schema, scoring math, ML pipeline, and every route.
 
 ---
 
-You're set. Run `bun dev` and open http://localhost:3000. 🎯
+## 13. Push changes back to Lovable
+
+**If cloned from GitHub:**
+
+```bash
+git add .
+git commit -m "your changes"
+git push
+```
+
+Lovable's GitHub sync is bidirectional — commits appear in the editor within seconds.
+
+**If you downloaded a ZIP:** connect the project to GitHub first (Lovable editor → **+** → GitHub → Connect), then clone and copy your edits.
+
+---
+
+You're set. Run `bun dev`, open **http://localhost:5173**. 🎯
+
+_Developed by **Swathi P R**._
