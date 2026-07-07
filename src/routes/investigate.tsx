@@ -874,12 +874,22 @@ function ReportView({
                 {r.trust_score}
               </span>
               <span className="text-lg text-muted-foreground">/100</span>
+              <span
+                className="ml-2 rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
+                style={{ borderColor: `${meta.color}55` }}
+                title={r.confidence_band.reason}
+              >
+                ± {r.confidence_band.band}
+              </span>
             </div>
             <div
               className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
               style={{ background: `${meta.color}18`, color: meta.color }}
             >
               {meta.label}
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Range: {r.confidence_band.low}–{r.confidence_band.high} · {r.confidence_band.reason}
             </div>
           </div>
           <div className="grid gap-2 text-sm">
