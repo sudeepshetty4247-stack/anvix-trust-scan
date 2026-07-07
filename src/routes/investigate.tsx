@@ -130,7 +130,16 @@ function GuestInvestigate() {
             data: { kind, filename: file.name, payload, mime_type: file.type || "" },
           })) as ExtractedEvidence;
           setEvidence((prev) =>
-            prev.map((e) => (e.id === id ? { ...e, ...extracted, status: "ready" } : e)),
+            prev.map((e) =>
+              e.id === id
+                ? {
+                    ...e,
+                    ...extracted,
+                    status: "ready",
+                    pdf_base64: kind === "pdf" ? payload : undefined,
+                  }
+                : e,
+            ),
           );
           if (!caseName) {
             const guess = extracted.companies[0] || extracted.people[0] || file.name;
