@@ -114,7 +114,7 @@ export function extractEmails(text: string): string[] {
 }
 
 export function extractUrls(text: string): string[] {
-  return Array.from(new Set(text.match(/https?:\/\/[^\s"'<>)]+/gi) ?? []));
+  return Array.from(new Set(text.match(/https?:\/\/[^\s,"'<>)]+/gi) ?? []));
 }
 
 async function doh(name: string, type: string): Promise<any> {
