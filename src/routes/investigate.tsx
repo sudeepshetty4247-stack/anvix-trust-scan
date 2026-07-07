@@ -809,8 +809,12 @@ function ReportView({
           </div>
           <div className="grid gap-2 text-sm">
             <Stat
-              label="ML fraud probability"
-              value={`${(r.fraud_probability * 100).toFixed(1)}%`}
+              label="Ensemble P(fraud)"
+              value={`${(r.ensemble_breakdown.ensemble * 100).toFixed(1)}%`}
+            />
+            <Stat
+              label="LR / GBM"
+              value={`${(r.ensemble_breakdown.lr * 100).toFixed(0)}% / ${(r.ensemble_breakdown.gbm * 100).toFixed(0)}%`}
             />
             <Stat label="Weighted baseline" value={`${r.weighted_score}/100`} />
             <Stat label="Confidence" value={`${(r.confidence * 100).toFixed(0)}%`} />
