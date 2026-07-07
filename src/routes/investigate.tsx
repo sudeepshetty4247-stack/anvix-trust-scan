@@ -316,6 +316,48 @@ function GuestInvestigate() {
       if (identityRes.status === "rejected") console.warn("Identity graph failed:", identityRes.reason);
       if (forensicsRes.status === "rejected") console.warn("Offer forensics failed:", forensicsRes.reason);
 
+      // Publish a public read-only snapshot so the verdict can be shared.
+      let publicSlug: string | undefined;
+      try {
+        const topReasons = [
+          ...result.negative_findings.slice(0, 3),
+          ...(result.negative_findings.length < 3
+            ? result.positive_findings.slice(0, 3 - result.negative_findings.length)
+            : []),
+        ].slice(0, 3);
+        const fingerprints: { kind: string; masked: string }[] = [
+          ...result.emails.slice(0, 2).map((e) => ({
+            kind: "email",
+            masked: (() => {
+              const [u, d] = e.split("@");
+              return d ? `${u.slice(0, 2)}***@${d}` : "***";
+            })(),
+          })),
+          ...result.domains.slice(0, 2).map((d) => ({ kind: "domain", masked: d })),
+          ...result.phones.slice(0, 1).map((p) => ({
+            kind: "phone",
+            masked: p.length > 6 ? p.slice(0, 4) + "***" + p.slice(-2) : "***",
+          })),
+        ].slice(0, 5);
+        const pub = await publishFn({
+          data: {
+            investigation_id: null,
+            case_name: finalName,
+            verdict: result.risk_category,
+            trust_score: result.trust_score,
+            confidence_low: result.confidence_band.low,
+            confidence_high: result.confidence_band.high,
+            band_reason: result.confidence_band.reason,
+            top_reasons: topReasons,
+            contact_fingerprints: fingerprints,
+            source: "guest",
+          },
+        });
+        publicSlug = pub.slug;
+      } catch (err) {
+        console.warn("Public share failed:", err);
+      }
+
       const rec: GuestRecord = {
         id: crypto.randomUUID(),
         name: finalName,
@@ -325,6 +367,7 @@ function GuestInvestigate() {
         narrative,
         identity_graph,
         offer_forensics,
+        public_slug: publicSlug,
       };
       saveGuestCurrent(rec);
       setRecord(rec);
