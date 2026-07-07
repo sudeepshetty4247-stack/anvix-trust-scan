@@ -11,11 +11,27 @@ import {
 import { predictFraudProbability, featureContributions, KAGGLE_MODEL, type KaggleFeatures } from "./kaggle-model";
 import { scoreFeatures, type RiskCategory } from "./scoring";
 
+const EvidenceItem = z.object({
+  kind: z.string(),
+  filename: z.string().default(""),
+  extracted_text: z.string().default(""),
+  channel: z.string().default("unknown"),
+  urls: z.array(z.string()).default([]),
+  emails: z.array(z.string()).default([]),
+  phones: z.array(z.string()).default([]),
+  people: z.array(z.string()).default([]),
+  companies: z.array(z.string()).default([]),
+  amounts: z.array(z.string()).default([]),
+  payment_methods: z.array(z.string()).default([]),
+  red_flag_notes: z.array(z.string()).default([]),
+});
+
 const Input = z.object({
   name: z.string().trim().min(1).max(200),
   urls: z.array(z.string().trim()).max(20).default([]),
   emails: z.array(z.string().trim()).max(20).default([]),
   text: z.string().max(20000).default(""),
+  evidence: z.array(EvidenceItem).max(20).default([]),
 });
 
 export type GuestVerification = {
@@ -41,11 +57,15 @@ export type GuestResult = {
   verifications: GuestVerification[];
   domains: string[];
   emails: string[];
+  phones: string[];
+  companies: string[];
+  payment_methods: string[];
   summary: string;
   positive_findings: string[];
   negative_findings: string[];
   missing_evidence: string[];
   recommendation: string;
+  verifications_summary: string;
   model_metadata: {
     trained_on: string;
     n_rows: number;
@@ -61,10 +81,27 @@ const SUS_TLDS = [".xyz",".top",".click",".loan",".work",".zip",".mov",".country
 export const runGuestInvestigation = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
-    const corpus = [data.name, data.text, ...data.urls, ...data.emails].join("\n");
+    // Aggregate all inputs — free-typed and extracted-from-evidence
+    const aggregatedUrls = Array.from(new Set([
+      ...data.urls,
+      ...data.evidence.flatMap((e) => e.urls),
+    ].map((u) => u.trim()).filter(Boolean)));
+    const aggregatedEmails = Array.from(new Set([
+      ...data.emails,
+      ...data.evidence.flatMap((e) => e.emails),
+    ].map((e) => e.trim().toLowerCase()).filter(Boolean)));
+    const aggregatedText = [
+      data.text,
+      ...data.evidence.map((e) => e.extracted_text),
+    ].filter(Boolean).join("\n\n");
+    const aggregatedPhones = Array.from(new Set(data.evidence.flatMap((e) => e.phones)));
+    const aggregatedCompanies = Array.from(new Set(data.evidence.flatMap((e) => e.companies)));
+    const aggregatedPayments = Array.from(new Set(data.evidence.flatMap((e) => e.payment_methods)));
+
+    const corpus = [data.name, aggregatedText, ...aggregatedUrls, ...aggregatedEmails].join("\n");
     const domains = Array.from(new Set([
-      ...data.urls.map(extractDomain).filter((d): d is string => !!d),
-      ...data.emails.map((e) => e.split("@")[1]?.toLowerCase()).filter((d): d is string => !!d),
+      ...aggregatedUrls.map(extractDomain).filter((d): d is string => !!d),
+      ...aggregatedEmails.map((e) => e.split("@")[1]?.toLowerCase()).filter((d): d is string => !!d),
     ]));
 
     const verifications: GuestVerification[] = [];
@@ -101,7 +138,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
 
     // -- Free-email recruiter --
     let freeEmailCount = 0;
-    for (const em of data.emails) {
+    for (const em of aggregatedEmails) {
       if (isFreeEmail(em)) {
         freeEmailCount++;
         push("recruiter", `Free-email recruiter — ${em}`,
@@ -117,9 +154,24 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     push("content","Cryptocurrency mention", tx.crypto);
     push("content","Grammar quality", tx.grammar);
 
+    // -- Evidence-derived signals --
+    const suspiciousPayments = aggregatedPayments.filter((p) =>
+      /crypto|usdt|bitcoin|btc|gift card|western union|moneygram|upi|personal bank/i.test(p)
+    );
+    if (suspiciousPayments.length > 0) {
+      push("payment", `Suspicious payment method(s)`,
+        { status: "fail", score: 1, detail: `Evidence mentions: ${suspiciousPayments.join(", ")}` });
+    }
+    for (const ev of data.evidence) {
+      for (const note of ev.red_flag_notes.slice(0, 2)) {
+        push("evidence", `Observation — ${ev.kind}${ev.filename ? ` (${ev.filename})` : ""}`,
+          { status: "warning", score: 1, detail: note });
+      }
+    }
+
     // -- Cross-source --
-    const officialMatch = data.emails.length && domains.length
-      ? data.emails.some((e) => domains.includes(e.split("@")[1]?.toLowerCase() ?? "")) ? 1 : 0
+    const officialMatch = aggregatedEmails.length && domains.length
+      ? aggregatedEmails.some((e) => domains.includes(e.split("@")[1]?.toLowerCase() ?? "")) ? 1 : 0
       : 0.5;
     push("evidence","Cross-source consistency",
       { status: officialMatch === 1 ? "pass" : "warning", score: officialMatch,
@@ -127,14 +179,14 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
 
     // -- Kaggle-LR features --
     const kf: KaggleFeatures = {
-      fraud_keywords_norm: 1 - tx.fraud.score >= 1 ? 0 : Math.min(1, (tx.fraud.data as string[] | undefined)?.length ? (tx.fraud.data as string[]).length/5 : tx.fraud.score),
+      fraud_keywords_norm: Math.min(1, ((tx.fraud.data as string[] | undefined)?.length ?? 0)/5),
       urgency_norm: Math.min(1, ((tx.urgency.data as string[] | undefined)?.length ?? 0)/3),
-      payment_norm: tx.payment.status === "fail" ? 1 : 0,
+      payment_norm: tx.payment.status === "fail" || suspiciousPayments.length > 0 ? 1 : 0,
       crypto_norm:  tx.crypto.status === "fail" ? 1 : 0,
       grammar_quality: tx.grammar.score,
-      has_url: data.urls.length > 0 ? 1 : 0,
-      has_email: data.emails.length > 0 ? 1 : 0,
-      free_email_present: data.emails.some((e) => FREE_EMAIL_DOMS.has(e.split("@")[1] ?? "")) ? 1 : 0,
+      has_url: aggregatedUrls.length > 0 ? 1 : 0,
+      has_email: aggregatedEmails.length > 0 ? 1 : 0,
+      free_email_present: aggregatedEmails.some((e) => FREE_EMAIL_DOMS.has(e.split("@")[1] ?? "")) ? 1 : 0,
       sus_tld_present: (anySusTld || SUS_TLDS.some((t) => corpus.toLowerCase().includes(t))) ? 1 : 0,
       has_company_logo: 0,
       has_questions: 0,
@@ -152,19 +204,18 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     const wf = {
       domain_age: age, ssl_valid: ssl, dns_valid: dnsScore, spf, dmarc,
       official_email_match: officialMatch, website_reachable: web,
-      fraud_keywords: 1 - tx.fraud.score, payment_request: 1 - tx.payment.score,
+      fraud_keywords: 1 - tx.fraud.score, payment_request: (tx.payment.status === "fail" || suspiciousPayments.length > 0) ? 0 : 1,
       crypto_mention: 1 - tx.crypto.score, urgency_score: 1 - tx.urgency.score,
       grammar_quality: tx.grammar.score,
-      evidence_count: Math.min(1, (data.urls.length + data.emails.length + (data.text ? 1 : 0)) / 5),
-      evidence_diversity: Math.min(1, (Number(data.urls.length>0)+Number(data.emails.length>0)+Number(!!data.text)) / 3),
+      evidence_count: Math.min(1, (aggregatedUrls.length + aggregatedEmails.length + data.evidence.length + (data.text ? 1 : 0)) / 5),
+      evidence_diversity: Math.min(1, (Number(aggregatedUrls.length>0)+Number(aggregatedEmails.length>0)+Number(!!data.text)+Number(data.evidence.length>0)) / 4),
       cross_source_consistency: officialMatch,
       suspicious_tld: anySusTld ? 0 : 1,
-      free_email_recruiter: data.emails.length ? 1 - Math.min(1, freeEmailCount / data.emails.length) : 0.5,
+      free_email_recruiter: aggregatedEmails.length ? 1 - Math.min(1, freeEmailCount / aggregatedEmails.length) : 0.5,
     };
     const weighted = scoreFeatures(wf);
 
     // -- Final score: blend Kaggle-LR probability (60%) with weighted baseline (40%) --
-    // LR alone has recall 0.62 but low precision on this dataset — the weighted model corrects that.
     const trust_from_lr = Math.round((1 - pFraud) * 100);
     const trust = Math.round(trust_from_lr * 0.6 + weighted.score * 0.4);
     const category: RiskCategory =
@@ -179,6 +230,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     const missing: string[] = [];
     if (tx.fraud.status === "fail") negatives.push(`Fraud keywords detected: ${((tx.fraud.data as string[]) ?? []).slice(0,3).join(", ")}`);
     if (tx.payment.status === "fail") negatives.push("Text asks the candidate for money — classic fraud signal.");
+    if (suspiciousPayments.length > 0) negatives.push(`Suspicious payment methods present: ${suspiciousPayments.join(", ")}`);
     if (tx.crypto.status === "fail") negatives.push("Cryptocurrency mentioned in a recruitment context.");
     if (tx.urgency.status === "warning") negatives.push("Multiple urgency terms — pressure tactic.");
     if (anySusTld) negatives.push("Domain uses a TLD frequent in scam registrations.");
@@ -190,8 +242,9 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
     if (dmarc > 0.5) positives.push("DMARC policy present.");
     if (officialMatch === 1) positives.push("Recruiter email domain matches company website.");
     if (domains.length === 0) missing.push("No verifiable website / company domain in evidence.");
-    if (data.emails.length === 0) missing.push("No recruiter email supplied.");
-    if (data.text.length < 200) missing.push("Full job description would improve model confidence.");
+    if (aggregatedEmails.length === 0) missing.push("No recruiter email in evidence.");
+    if (aggregatedText.length < 200) missing.push("Longer job description / message would improve model confidence.");
+    if (data.evidence.length === 0) missing.push("Add a screenshot, offer letter, or forwarded email to strengthen the investigation.");
 
     const recommendation =
       trust >= 70 ? "Likely legitimate — proceed with normal caution. Verify identity via a video call on the company's official platform." :
@@ -199,13 +252,19 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       trust >= 30 ? "High risk. Do not send ID, bank details, or payments. Independently verify via the company's public HR contact." :
                     "Likely fraud. Cease contact, do not send documents or money, and report to the platform where you found it.";
 
-    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-LR-v1 model (trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) and a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_"," ")}). The Kaggle model estimated fraud probability at ${(pFraud*100).toFixed(1)}% across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${data.emails.length} email(s).`;
+    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-LR-v1 model (trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) and a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_"," ")}). The Kaggle model estimated fraud probability at ${(pFraud*100).toFixed(1)}% across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${aggregatedEmails.length} email(s).`;
+
+    const verifications_summary = verifications
+      .filter((v) => v.status === "fail" || v.status === "warning")
+      .slice(0, 6)
+      .map((v) => `${v.status.toUpperCase()}: ${v.check_name} — ${v.detail}`)
+      .join(" | ") || "All checks passed.";
 
     const result: GuestResult = {
       trust_score: trust,
       risk_category: category,
       confidence: weighted.confidence,
-      model_used: `ANVIX-Blend-v1 (Kaggle-LR ${(60).toString()}% + Weighted-Baseline 40%)`,
+      model_used: `ANVIX-Blend-v1 (Kaggle-LR 60% + Weighted-Baseline 40%)`,
       fraud_probability: Math.round(pFraud * 10000) / 10000,
       kaggle_features: kf,
       kaggle_contributions: Object.fromEntries(Object.entries(kaggleContribs).map(([k,v]) => [k, Math.round(v*1000)/1000])),
@@ -213,12 +272,16 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       weighted_score: weighted.score,
       verifications,
       domains,
-      emails: data.emails,
+      emails: aggregatedEmails,
+      phones: aggregatedPhones,
+      companies: aggregatedCompanies,
+      payment_methods: aggregatedPayments,
       summary,
       positive_findings: positives,
       negative_findings: negatives,
       missing_evidence: missing,
       recommendation,
+      verifications_summary,
       model_metadata: {
         trained_on: KAGGLE_MODEL.trained_on,
         n_rows: KAGGLE_MODEL.n_rows,

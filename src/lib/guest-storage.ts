@@ -3,21 +3,31 @@
 // their account via the authenticated claimGuestInvestigation server fn.
 
 import type { GuestResult } from "./guest.functions";
+import type { ExtractedEvidence } from "./evidence.functions";
+import type { Narrative } from "./narrative.functions";
 
 const CURRENT = "anvix:guest:current";
 const HISTORY = "anvix:guest:history";
 const MAX_HISTORY = 20;
 
+export type GuestEvidenceItem = ExtractedEvidence & {
+  id: string;
+  preview_data_url?: string; // for images: small preview to render
+  original_size?: number;
+};
+
 export type GuestRecord = {
-  id: string; // client-generated
+  id: string;
   name: string;
   createdAt: string;
   input: {
     urls: string[];
     emails: string[];
     text: string;
+    evidence: GuestEvidenceItem[];
   };
   result: GuestResult;
+  narrative?: Narrative;
 };
 
 const safe = <T,>(fn: () => T, fallback: T): T => {
