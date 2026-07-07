@@ -67,22 +67,22 @@ function Landing() {
             live, matches it to <span className="text-foreground">known scam playbooks</span>, and
             tells you exactly what they'll ask for next.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 grid gap-3 sm:grid-cols-3 sm:gap-4">
             <Link
               to="/ask"
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               Ask ANVIX — 5-second check <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               to="/investigate"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-5 py-2.5 text-sm hover:bg-accent"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-5 py-3 text-sm font-medium hover:bg-accent"
             >
               Run a full investigation
             </Link>
             <Link
               to="/check-payment"
-              className="inline-flex items-center gap-2 rounded-md border border-warning/50 bg-warning/10 px-5 py-2.5 text-sm text-warning hover:bg-warning/20"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-warning/50 bg-warning/10 px-5 py-3 text-sm font-medium text-warning hover:bg-warning/20"
             >
               Before you pay — check UPI / account
             </Link>
