@@ -1,7 +1,12 @@
-// Server-only Lovable AI Gateway helper. Uses OpenAI-compatible chat
-// completions surface. Never import from client code.
+// Server-only AI Gateway helper. Uses OpenAI-compatible chat completions.
+// - On Lovable Cloud: uses LOVABLE_API_KEY against Lovable's gateway.
+// - On a local laptop: set GEMINI_API_KEY (from https://aistudio.google.com/apikey)
+//   and it automatically falls back to Google's public Gemini endpoint.
+// Never import from client code.
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const LOVABLE_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -15,25 +20,42 @@ export async function callLovableAI(opts: {
   response_format?: { type: "json_object" };
   temperature?: number;
 }): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY not configured");
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  // Pick provider automatically based on which key is present.
+  const useGemini = !lovableKey && !!geminiKey;
+  const key = useGemini ? geminiKey! : lovableKey;
+  if (!key) {
+    throw new Error(
+      "No AI key configured. Set LOVABLE_API_KEY (on Lovable Cloud) or GEMINI_API_KEY (for local runs).",
+    );
+  }
+
+  const requestedModel = opts.model ?? "google/gemini-2.5-flash";
+  // Google's public endpoint expects the bare model id, e.g. "gemini-2.5-flash".
+  const model = useGemini ? requestedModel.replace(/^google\//, "") : requestedModel;
+
   const body = {
-    model: opts.model ?? "google/gemini-2.5-flash",
+    model,
     messages: opts.messages,
     ...(opts.response_format ? { response_format: opts.response_format } : {}),
     ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
   };
-  const res = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify(body),
-  });
+
+  const url = useGemini ? GEMINI_URL : LOVABLE_URL;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (useGemini) {
+    headers["Authorization"] = `Bearer ${key}`;
+  } else {
+    headers["Lovable-API-Key"] = key;
+  }
+
+  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`AI Gateway ${res.status}: ${text.slice(0, 500)}`);
+    const provider = useGemini ? "Gemini" : "Lovable AI Gateway";
+    throw new Error(`${provider} ${res.status}: ${text.slice(0, 500)}`);
   }
   const json = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
