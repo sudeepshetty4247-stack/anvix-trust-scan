@@ -27,8 +27,8 @@ export const FEATURE_WEIGHTS: Record<string, number> = {
 };
 
 export function scoreFeatures(features: FeatureVector): {
-  score: number;                    // 0..100 (higher = more trustworthy)
-  confidence: number;               // 0..1
+  score: number; // 0..100 (higher = more trustworthy)
+  confidence: number; // 0..1
   category: RiskCategory;
   importance: Record<string, number>;
 } {
@@ -44,7 +44,10 @@ export function scoreFeatures(features: FeatureVector): {
     raw += c;
   }
   const score = Math.max(0, Math.min(100, Math.round(raw)));
-  const confidence = Math.max(0.35, Math.min(0.98, 0.4 + seen / (Object.keys(FEATURE_WEIGHTS).length * 1.4)));
+  const confidence = Math.max(
+    0.35,
+    Math.min(0.98, 0.4 + seen / (Object.keys(FEATURE_WEIGHTS).length * 1.4)),
+  );
 
   let category: RiskCategory;
   if (score >= 85) category = "trusted";
@@ -56,15 +59,16 @@ export function scoreFeatures(features: FeatureVector): {
   // importance = |contribution| normalized
   const total = Object.values(contribs).reduce((s, v) => s + Math.abs(v), 0) || 1;
   const importance: Record<string, number> = {};
-  for (const [k, v] of Object.entries(contribs)) importance[k] = Math.round((Math.abs(v) / total) * 1000) / 1000;
+  for (const [k, v] of Object.entries(contribs))
+    importance[k] = Math.round((Math.abs(v) / total) * 1000) / 1000;
 
   return { score, confidence: Math.round(confidence * 100) / 100, category, importance };
 }
 
 export const RISK_META: Record<RiskCategory, { label: string; tone: string; color: string }> = {
-  trusted:     { label: "Trusted",         tone: "success",     color: "var(--risk-trusted)" },
-  likely_safe: { label: "Likely safe",     tone: "success",     color: "var(--risk-safe)"    },
-  caution:     { label: "Caution",         tone: "warning",     color: "var(--risk-caution)" },
-  high_risk:   { label: "High risk",       tone: "destructive", color: "var(--risk-high)"    },
-  fraudulent:  { label: "Likely fraud",    tone: "destructive", color: "var(--risk-fraud)"   },
+  trusted: { label: "Trusted", tone: "success", color: "var(--risk-trusted)" },
+  likely_safe: { label: "Likely safe", tone: "success", color: "var(--risk-safe)" },
+  caution: { label: "Caution", tone: "warning", color: "var(--risk-caution)" },
+  high_risk: { label: "High risk", tone: "destructive", color: "var(--risk-high)" },
+  fraudulent: { label: "Likely fraud", tone: "destructive", color: "var(--risk-fraud)" },
 };

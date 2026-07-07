@@ -35,7 +35,7 @@ export async function callLovableAI(opts: {
     const text = await res.text().catch(() => "");
     throw new Error(`AI Gateway ${res.status}: ${text.slice(0, 500)}`);
   }
-  const json = await res.json() as {
+  const json = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
   return json.choices?.[0]?.message?.content ?? "";

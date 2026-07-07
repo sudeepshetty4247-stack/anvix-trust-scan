@@ -5,8 +5,8 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { GuestRecord } from "./guest-storage";
 
-const M = 48;                       // page margin
-const PAGE_W = 595.28;              // A4
+const M = 48; // page margin
+const PAGE_W = 595.28; // A4
 const PAGE_H = 841.89;
 const LINE = 14;
 const PRIMARY = rgb(0.28, 0.72, 0.52);
@@ -26,27 +26,48 @@ function ensure(ctx: Ctx, needed: number) {
 }
 function header(ctx: Ctx) {
   ctx.page.drawText("ANVIX", { x: M, y: PAGE_H - 30, size: 12, font: ctx.bold, color: PRIMARY });
-  ctx.page.drawText("Recruitment Trust & Fraud Report", { x: M + 46, y: PAGE_H - 30, size: 10, font: ctx.font, color: MUTED });
-  ctx.page.drawLine({ start: { x: M, y: PAGE_H - 40 }, end: { x: PAGE_W - M, y: PAGE_H - 40 }, thickness: 0.5, color: DIVIDER });
+  ctx.page.drawText("Recruitment Trust & Fraud Report", {
+    x: M + 46,
+    y: PAGE_H - 30,
+    size: 10,
+    font: ctx.font,
+    color: MUTED,
+  });
+  ctx.page.drawLine({
+    start: { x: M, y: PAGE_H - 40 },
+    end: { x: PAGE_W - M, y: PAGE_H - 40 },
+    thickness: 0.5,
+    color: DIVIDER,
+  });
   ctx.y = PAGE_H - M - 12;
 }
 function wrap(text: string, font: PDFFont, size: number, maxW: number): string[] {
   const words = text.replace(/\r/g, "").split("\n");
   const out: string[] = [];
   for (const para of words) {
-    if (!para.trim()) { out.push(""); continue; }
+    if (!para.trim()) {
+      out.push("");
+      continue;
+    }
     const w = para.split(/\s+/);
     let line = "";
     for (const word of w) {
       const trial = line ? line + " " + word : word;
       if (font.widthOfTextAtSize(trial, size) <= maxW) line = trial;
-      else { if (line) out.push(line); line = word; }
+      else {
+        if (line) out.push(line);
+        line = word;
+      }
     }
     if (line) out.push(line);
   }
   return out;
 }
-function drawParagraph(ctx: Ctx, text: string, opts: { size?: number; bold?: boolean; color?: ReturnType<typeof rgb>; indent?: number } = {}) {
+function drawParagraph(
+  ctx: Ctx,
+  text: string,
+  opts: { size?: number; bold?: boolean; color?: ReturnType<typeof rgb>; indent?: number } = {},
+) {
   const size = opts.size ?? 10;
   const font = opts.bold ? ctx.bold : ctx.font;
   const color = opts.color ?? TEXT;
@@ -70,14 +91,25 @@ function drawH2(ctx: Ctx, text: string) {
   ctx.y -= 6;
   ctx.page.drawText(text, { x: M, y: ctx.y, size: 12, font: ctx.bold, color: PRIMARY });
   ctx.y -= 16;
-  ctx.page.drawLine({ start: { x: M, y: ctx.y + 4 }, end: { x: PAGE_W - M, y: ctx.y + 4 }, thickness: 0.4, color: DIVIDER });
+  ctx.page.drawLine({
+    start: { x: M, y: ctx.y + 4 },
+    end: { x: PAGE_W - M, y: ctx.y + 4 },
+    thickness: 0.4,
+    color: DIVIDER,
+  });
   ctx.y -= 4;
 }
 function drawKV(ctx: Ctx, key: string, value: string) {
   ensure(ctx, LINE);
   ctx.page.drawText(key, { x: M, y: ctx.y, size: 9, font: ctx.bold, color: MUTED });
   const vlines = wrap(value, ctx.font, 10, PAGE_W - M * 2 - 140);
-  ctx.page.drawText(vlines[0] ?? "", { x: M + 140, y: ctx.y, size: 10, font: ctx.font, color: TEXT });
+  ctx.page.drawText(vlines[0] ?? "", {
+    x: M + 140,
+    y: ctx.y,
+    size: 10,
+    font: ctx.font,
+    color: TEXT,
+  });
   ctx.y -= LINE;
   for (let i = 1; i < vlines.length; i++) {
     ensure(ctx, LINE);
@@ -103,18 +135,42 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
 
   // Title block
   drawH1(ctx, rec.name);
-  drawParagraph(ctx, `Generated ${new Date().toLocaleString()} · ANVIX-Blend-v1`, { size: 9, color: MUTED });
+  drawParagraph(ctx, `Generated ${new Date().toLocaleString()} · ANVIX-Blend-v1`, {
+    size: 9,
+    color: MUTED,
+  });
   ctx.y -= 6;
 
   // Score block
   const r = rec.result;
   drawH2(ctx, "Trust Score");
   ensure(ctx, 40);
-  ctx.page.drawText(`${r.trust_score}`, { x: M, y: ctx.y - 20, size: 48, font: bold, color: PRIMARY });
+  ctx.page.drawText(`${r.trust_score}`, {
+    x: M,
+    y: ctx.y - 20,
+    size: 48,
+    font: bold,
+    color: PRIMARY,
+  });
   ctx.page.drawText(`/100`, { x: M + 90, y: ctx.y - 16, size: 14, font, color: MUTED });
-  ctx.page.drawText(r.risk_category.replace("_", " ").toUpperCase(), { x: M + 140, y: ctx.y - 10, size: 12, font: bold, color: TEXT });
-  ctx.page.drawText(`ML fraud probability: ${(r.fraud_probability * 100).toFixed(1)}%`, { x: M + 140, y: ctx.y - 26, size: 9, font, color: MUTED });
-  ctx.page.drawText(`Weighted baseline: ${r.weighted_score}/100  ·  Confidence: ${(r.confidence * 100).toFixed(0)}%`, { x: M + 140, y: ctx.y - 40, size: 9, font, color: MUTED });
+  ctx.page.drawText(r.risk_category.replace("_", " ").toUpperCase(), {
+    x: M + 140,
+    y: ctx.y - 10,
+    size: 12,
+    font: bold,
+    color: TEXT,
+  });
+  ctx.page.drawText(`ML fraud probability: ${(r.fraud_probability * 100).toFixed(1)}%`, {
+    x: M + 140,
+    y: ctx.y - 26,
+    size: 9,
+    font,
+    color: MUTED,
+  });
+  ctx.page.drawText(
+    `Weighted baseline: ${r.weighted_score}/100  ·  Confidence: ${(r.confidence * 100).toFixed(0)}%`,
+    { x: M + 140, y: ctx.y - 40, size: 9, font, color: MUTED },
+  );
   ctx.y -= 60;
 
   drawParagraph(ctx, r.summary);
@@ -124,7 +180,8 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
   // Narrative + Playbook
   if (rec.narrative) {
     drawH2(ctx, "Investigator Narrative");
-    if (rec.narrative.headline) drawParagraph(ctx, rec.narrative.headline, { bold: true, size: 11 });
+    if (rec.narrative.headline)
+      drawParagraph(ctx, rec.narrative.headline, { bold: true, size: 11 });
     drawParagraph(ctx, rec.narrative.narrative);
     if (rec.narrative.key_evidence.length) {
       ctx.y -= 4;
@@ -135,7 +192,11 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     const pb = rec.narrative.playbook;
     if (pb.playbook_id) {
       drawH2(ctx, "Scam Playbook Match");
-      drawKV(ctx, "Playbook", `${pb.playbook_name}  (confidence ${(pb.confidence * 100).toFixed(0)}%)`);
+      drawKV(
+        ctx,
+        "Playbook",
+        `${pb.playbook_name}  (confidence ${(pb.confidence * 100).toFixed(0)}%)`,
+      );
       if (pb.current_step_index !== null) drawKV(ctx, "Current step", `#${pb.current_step_index}`);
       if (pb.matched_signals.length) drawKV(ctx, "Matched signals", pb.matched_signals.join(", "));
       if (pb.next_move) drawKV(ctx, "Likely next move", pb.next_move);
@@ -172,7 +233,11 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     drawParagraph(ctx, "No structured evidence uploaded.", { color: MUTED });
   } else {
     rec.input.evidence.forEach((ev, i) => {
-      drawParagraph(ctx, `#${i + 1}  ${ev.kind.toUpperCase()}${ev.filename ? "  ·  " + ev.filename : ""}  ·  channel: ${ev.channel}`, { bold: true, size: 10 });
+      drawParagraph(
+        ctx,
+        `#${i + 1}  ${ev.kind.toUpperCase()}${ev.filename ? "  ·  " + ev.filename : ""}  ·  channel: ${ev.channel}`,
+        { bold: true, size: 10 },
+      );
       if (ev.people.length) drawKV(ctx, "People", ev.people.join(", "));
       if (ev.companies.length) drawKV(ctx, "Companies", ev.companies.join(", "));
       if (ev.emails.length) drawKV(ctx, "Emails", ev.emails.join(", "));
@@ -186,7 +251,11 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
       }
       if (ev.extracted_text) {
         drawParagraph(ctx, "Excerpt:", { bold: true, size: 9 });
-        drawParagraph(ctx, ev.extracted_text.slice(0, 800) + (ev.extracted_text.length > 800 ? "…" : ""), { size: 9, color: MUTED });
+        drawParagraph(
+          ctx,
+          ev.extracted_text.slice(0, 800) + (ev.extracted_text.length > 800 ? "…" : ""),
+          { size: 9, color: MUTED },
+        );
       }
       ctx.y -= 4;
     });
@@ -197,7 +266,12 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
   r.verifications.forEach((v) => {
     ensure(ctx, LINE);
     const icon = v.status === "pass" ? "✓" : v.status === "fail" ? "✗" : "!";
-    const color = v.status === "pass" ? PRIMARY : v.status === "fail" ? rgb(0.85, 0.28, 0.28) : rgb(0.85, 0.65, 0.2);
+    const color =
+      v.status === "pass"
+        ? PRIMARY
+        : v.status === "fail"
+          ? rgb(0.85, 0.28, 0.28)
+          : rgb(0.85, 0.65, 0.2);
     ctx.page.drawText(icon, { x: M, y: ctx.y, size: 10, font: bold, color });
     ctx.page.drawText(v.check_name, { x: M + 14, y: ctx.y, size: 9, font: bold, color: TEXT });
     ctx.y -= LINE;
@@ -207,23 +281,40 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
   // Model info
   drawH2(ctx, "Model & Methodology");
   drawKV(ctx, "Model", r.model_used);
-  drawKV(ctx, "Trained on", `${r.model_metadata.trained_on} — ${r.model_metadata.n_rows.toLocaleString()} rows (${r.model_metadata.n_fraud.toLocaleString()} fraud-labeled)`);
+  drawKV(
+    ctx,
+    "Trained on",
+    `${r.model_metadata.trained_on} — ${r.model_metadata.n_rows.toLocaleString()} rows (${r.model_metadata.n_fraud.toLocaleString()} fraud-labeled)`,
+  );
   drawKV(ctx, "Best model (offline)", r.model_metadata.best_model);
   ctx.y -= 4;
   drawParagraph(ctx, "Model comparison (test-set holdout):", { bold: true, size: 9 });
   Object.entries(r.model_metadata.metrics).forEach(([n, m]) => {
-    drawKV(ctx, n, `acc ${m.accuracy.toFixed(3)}  ·  prec ${m.precision.toFixed(3)}  ·  rec ${m.recall.toFixed(3)}  ·  F1 ${m.f1.toFixed(3)}  ·  ROC-AUC ${m.roc_auc.toFixed(3)}`);
+    drawKV(
+      ctx,
+      n,
+      `acc ${m.accuracy.toFixed(3)}  ·  prec ${m.precision.toFixed(3)}  ·  rec ${m.recall.toFixed(3)}  ·  F1 ${m.f1.toFixed(3)}  ·  ROC-AUC ${m.roc_auc.toFixed(3)}`,
+    );
   });
 
   // Disclaimer
   drawH2(ctx, "Disclaimer");
-  drawParagraph(ctx, rec.narrative?.disclaimer ?? "This report is informational and does not constitute legal advice. Verify all findings independently before making decisions.", { size: 9, color: MUTED });
+  drawParagraph(
+    ctx,
+    rec.narrative?.disclaimer ??
+      "This report is informational and does not constitute legal advice. Verify all findings independently before making decisions.",
+    { size: 9, color: MUTED },
+  );
 
   // Footer page numbers
   const pages = doc.getPages();
   pages.forEach((p, i) => {
     p.drawText(`ANVIX · ${rec.name} · page ${i + 1} of ${pages.length}`, {
-      x: M, y: 24, size: 8, font, color: MUTED,
+      x: M,
+      y: 24,
+      size: 8,
+      font,
+      color: MUTED,
     });
   });
 

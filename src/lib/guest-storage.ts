@@ -30,8 +30,12 @@ export type GuestRecord = {
   narrative?: Narrative;
 };
 
-const safe = <T,>(fn: () => T, fallback: T): T => {
-  try { return fn(); } catch { return fallback; }
+const safe = <T>(fn: () => T, fallback: T): T => {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
 };
 
 export function saveGuestCurrent(rec: GuestRecord) {

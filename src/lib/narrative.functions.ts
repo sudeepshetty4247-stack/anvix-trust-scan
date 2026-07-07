@@ -18,35 +18,38 @@ const Input = z.object({
   positive_findings: z.array(z.string()),
   negative_findings: z.array(z.string()),
   verifications_summary: z.string(),
-  evidence: z.array(z.object({
-    kind: z.string(),
-    filename: z.string(),
-    extracted_text: z.string(),
-    channel: z.string(),
-    urls: z.array(z.string()),
-    emails: z.array(z.string()),
-    phones: z.array(z.string()),
-    payment_methods: z.array(z.string()),
-    red_flag_notes: z.array(z.string()),
-  })),
+  evidence: z.array(
+    z.object({
+      kind: z.string(),
+      filename: z.string(),
+      extracted_text: z.string(),
+      channel: z.string(),
+      urls: z.array(z.string()),
+      emails: z.array(z.string()),
+      phones: z.array(z.string()),
+      payment_methods: z.array(z.string()),
+      red_flag_notes: z.array(z.string()),
+    }),
+  ),
 });
 
 export type Narrative = {
   headline: string;
-  narrative: string;      // 2-4 sentence human explanation
+  narrative: string; // 2-4 sentence human explanation
   key_evidence: string[]; // bullet points cited to specific evidence
   playbook: PlaybookMatch;
   next_predicted_asks: string[]; // ordered list of what the scammer will ask for next
-  action_checklist: string[];    // concrete user actions
+  action_checklist: string[]; // concrete user actions
   disclaimer: string;
 };
 
-const PLAYBOOK_LIBRARY_TEXT = PLAYBOOKS.map((p, i) =>
-  `#${i + 1} id=${p.id} name="${p.name}"
+const PLAYBOOK_LIBRARY_TEXT = PLAYBOOKS.map(
+  (p, i) =>
+    `#${i + 1} id=${p.id} name="${p.name}"
    summary: ${p.summary}
    signals: ${p.signals.join("; ")}
    steps: ${p.steps.map((s, si) => `${si}. ${s}`).join(" | ")}
-   advice: ${p.advice}`
+   advice: ${p.advice}`,
 ).join("\n\n");
 
 const SYSTEM = `You are ANVIX, a senior recruitment-fraud investigator. You explain scam attempts in plain English so a candidate under time pressure can make a safe decision. You cite specific evidence. You never invent facts. You always ground playbook matches in the evidence provided. Output strict JSON only.`;
@@ -54,15 +57,18 @@ const SYSTEM = `You are ANVIX, a senior recruitment-fraud investigator. You expl
 export const narrate = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<Narrative> => {
-    const evidenceBlock = data.evidence.map((e, i) =>
-      `Evidence #${i + 1} — ${e.kind}${e.filename ? ` (${e.filename})` : ""}, channel: ${e.channel}
+    const evidenceBlock = data.evidence
+      .map(
+        (e, i) =>
+          `Evidence #${i + 1} — ${e.kind}${e.filename ? ` (${e.filename})` : ""}, channel: ${e.channel}
       urls: ${e.urls.join(", ") || "—"}
       emails: ${e.emails.join(", ") || "—"}
       phones: ${e.phones.join(", ") || "—"}
       payment_methods: ${e.payment_methods.join(", ") || "—"}
       red_flag_notes: ${e.red_flag_notes.join("; ") || "—"}
-      text: ${e.extracted_text.slice(0, 3000)}`
-    ).join("\n\n");
+      text: ${e.extracted_text.slice(0, 3000)}`,
+      )
+      .join("\n\n");
 
     const prompt = `Case: "${data.case_name}"
 Trust score: ${data.trust_score}/100 (${data.risk_category})
@@ -123,12 +129,14 @@ Task:
         playbook_name: pb.playbook_name ?? null,
         confidence: typeof pb.confidence === "number" ? pb.confidence : 0,
         matched_signals: Array.isArray(pb.matched_signals) ? pb.matched_signals : [],
-        current_step_index: typeof pb.current_step_index === "number" ? pb.current_step_index : null,
+        current_step_index:
+          typeof pb.current_step_index === "number" ? pb.current_step_index : null,
         next_move: pb.next_move ?? null,
         what_to_do: pb.what_to_do ?? "",
       },
       next_predicted_asks: Array.isArray(out.next_predicted_asks) ? out.next_predicted_asks : [],
       action_checklist: Array.isArray(out.action_checklist) ? out.action_checklist : [],
-      disclaimer: out.disclaimer ?? "This report is informational and does not constitute legal advice.",
+      disclaimer:
+        out.disclaimer ?? "This report is informational and does not constitute legal advice.",
     };
   });

@@ -49,11 +49,17 @@ export const extractEvidence = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<ExtractedEvidence> => {
     if (data.kind === "text" || data.kind === "eml") {
-      const label = data.kind === "eml" ? "raw email (.eml) file including headers" : "plain text pasted by the user";
+      const label =
+        data.kind === "eml"
+          ? "raw email (.eml) file including headers"
+          : "plain text pasted by the user";
       const out = await callJSON<Omit<ExtractedEvidence, "kind" | "filename">>({
         messages: [
           { role: "system", content: SYSTEM },
-          { role: "user", content: `Evidence type: ${label}\nFilename: ${data.filename || "(inline)"}\n\n---BEGIN EVIDENCE---\n${data.payload.slice(0, 60000)}\n---END EVIDENCE---\n\n${SCHEMA_INSTRUCTION}` },
+          {
+            role: "user",
+            content: `Evidence type: ${label}\nFilename: ${data.filename || "(inline)"}\n\n---BEGIN EVIDENCE---\n${data.payload.slice(0, 60000)}\n---END EVIDENCE---\n\n${SCHEMA_INSTRUCTION}`,
+          },
         ],
         temperature: 0,
       });
@@ -62,15 +68,23 @@ export const extractEvidence = createServerFn({ method: "POST" })
 
     // image or pdf — send as multimodal content
     const mime = data.mime_type || (data.kind === "image" ? "image/png" : "application/pdf");
-    const dataUrl = data.payload.startsWith("data:") ? data.payload : `data:${mime};base64,${data.payload}`;
+    const dataUrl = data.payload.startsWith("data:")
+      ? data.payload
+      : `data:${mime};base64,${data.payload}`;
 
     const contentParts: Array<Record<string, unknown>> = [
-      { type: "text", text: `Evidence type: ${data.kind === "image" ? "screenshot of a recruitment message, chat, or job posting" : "PDF (likely an offer letter, appointment letter, or job description)"}.\nFilename: ${data.filename || "(uploaded)"}.\n\nTranscribe and structure everything relevant. ${SCHEMA_INSTRUCTION}` },
+      {
+        type: "text",
+        text: `Evidence type: ${data.kind === "image" ? "screenshot of a recruitment message, chat, or job posting" : "PDF (likely an offer letter, appointment letter, or job description)"}.\nFilename: ${data.filename || "(uploaded)"}.\n\nTranscribe and structure everything relevant. ${SCHEMA_INSTRUCTION}`,
+      },
     ];
     if (data.kind === "image") {
       contentParts.push({ type: "image_url", image_url: { url: dataUrl } });
     } else {
-      contentParts.push({ type: "file", file: { filename: data.filename || "evidence.pdf", file_data: dataUrl } });
+      contentParts.push({
+        type: "file",
+        file: { filename: data.filename || "evidence.pdf", file_data: dataUrl },
+      });
     }
 
     const out = await callJSON<Omit<ExtractedEvidence, "kind" | "filename">>({
@@ -84,7 +98,10 @@ export const extractEvidence = createServerFn({ method: "POST" })
   });
 
 function normalise(o: Partial<ExtractedEvidence>): Omit<ExtractedEvidence, "kind" | "filename"> {
-  const arr = (v: unknown) => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((s) => s.trim()) : [];
+  const arr = (v: unknown) =>
+    Array.isArray(v)
+      ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((s) => s.trim())
+      : [];
   return {
     extracted_text: typeof o.extracted_text === "string" ? o.extracted_text : "",
     urls: arr(o.urls),

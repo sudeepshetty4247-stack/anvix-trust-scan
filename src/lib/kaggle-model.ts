@@ -21,10 +21,17 @@ export const KAGGLE_MODEL = coefsJson as {
   coefficients: number[];
   intercept: number;
   best_model_name: string;
-  metrics: Record<string, {
-    accuracy: number; precision: number; recall: number; f1: number;
-    roc_auc: number; confusion: number[][];
-  }>;
+  metrics: Record<
+    string,
+    {
+      accuracy: number;
+      precision: number;
+      recall: number;
+      f1: number;
+      roc_auc: number;
+      confusion: number[][];
+    }
+  >;
 };
 
 export type KaggleFeatures = {

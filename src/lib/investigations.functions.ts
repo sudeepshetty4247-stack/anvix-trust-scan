@@ -33,7 +33,9 @@ export const dashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const [invRes, evRes] = await Promise.all([
-      context.supabase.from("investigations").select("id,trust_score,risk_category,status", { count: "exact" }),
+      context.supabase
+        .from("investigations")
+        .select("id,trust_score,risk_category,status", { count: "exact" }),
       context.supabase.from("evidence").select("id", { count: "exact", head: true }),
     ]);
     if (invRes.error) throw new Error(invRes.error.message);
@@ -43,7 +45,8 @@ export const dashboardStats = createServerFn({ method: "GET" })
       ? Math.round(completed.reduce((s, i) => s + Number(i.trust_score), 0) / completed.length)
       : null;
     const dist: Record<string, number> = {};
-    for (const i of completed) dist[i.risk_category ?? "unknown"] = (dist[i.risk_category ?? "unknown"] ?? 0) + 1;
+    for (const i of completed)
+      dist[i.risk_category ?? "unknown"] = (dist[i.risk_category ?? "unknown"] ?? 0) + 1;
     return {
       totalInvestigations: invRes.count ?? invs.length,
       evidenceCollected: evRes.count ?? 0,
@@ -58,11 +61,31 @@ export const getInvestigation = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const [inv, evidence, verifications, activities, prediction, report] = await Promise.all([
       context.supabase.from("investigations").select("*").eq("id", data.id).single(),
-      context.supabase.from("evidence").select("*").eq("investigation_id", data.id).order("created_at"),
-      context.supabase.from("verifications").select("*").eq("investigation_id", data.id).order("created_at"),
-      context.supabase.from("activities").select("*").eq("investigation_id", data.id).order("created_at"),
-      context.supabase.from("ml_predictions").select("*").eq("investigation_id", data.id).maybeSingle(),
-      context.supabase.from("trust_reports").select("*").eq("investigation_id", data.id).maybeSingle(),
+      context.supabase
+        .from("evidence")
+        .select("*")
+        .eq("investigation_id", data.id)
+        .order("created_at"),
+      context.supabase
+        .from("verifications")
+        .select("*")
+        .eq("investigation_id", data.id)
+        .order("created_at"),
+      context.supabase
+        .from("activities")
+        .select("*")
+        .eq("investigation_id", data.id)
+        .order("created_at"),
+      context.supabase
+        .from("ml_predictions")
+        .select("*")
+        .eq("investigation_id", data.id)
+        .maybeSingle(),
+      context.supabase
+        .from("trust_reports")
+        .select("*")
+        .eq("investigation_id", data.id)
+        .maybeSingle(),
     ]);
     if (inv.error) throw new Error(inv.error.message);
     return {
@@ -77,14 +100,19 @@ export const getInvestigation = createServerFn({ method: "GET" })
 
 const AddEvidenceInput = z.object({
   investigation_id: z.string().uuid(),
-  items: z.array(z.object({
-    kind: z.enum(["url", "text", "file"]),
-    label: z.string().max(200).optional(),
-    content: z.string().max(20000).optional(),      // url or text or file name
-    storage_path: z.string().max(400).optional(),   // for file uploads
-    mime_type: z.string().max(120).optional(),
-    size_bytes: z.number().int().nonnegative().optional(),
-  })).min(1).max(30),
+  items: z
+    .array(
+      z.object({
+        kind: z.enum(["url", "text", "file"]),
+        label: z.string().max(200).optional(),
+        content: z.string().max(20000).optional(), // url or text or file name
+        storage_path: z.string().max(400).optional(), // for file uploads
+        mime_type: z.string().max(120).optional(),
+        size_bytes: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .min(1)
+    .max(30),
 });
 
 export const addEvidence = createServerFn({ method: "POST" })
