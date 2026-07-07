@@ -32,6 +32,7 @@ import {
   runLiveVerificationCore,
   type LiveVerificationResult,
 } from "./verification-live.functions";
+import { computeConfidence, type ConfidenceResult } from "./confidence";
 
 const EvidenceItem = z.object({
   kind: z.string(),
