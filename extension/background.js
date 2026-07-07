@@ -2,7 +2,7 @@
 // Adds a "Investigate with ANVIX" context-menu entry that opens the app
 // with the selected text (plus page URL + title) prefilled as evidence.
 
-const ANVIX_URL = "https://vetting-forge-ai.lovable.app";
+const ANVIX_URL = "https://anvix-trust-scan.lovable.app";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
