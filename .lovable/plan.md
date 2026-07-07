@@ -92,3 +92,29 @@ Model upgrade to DistilBERT is deferred — it's a 2-day training job and the cu
 - **Share card image**: PNG generated server-side (heavier, prettier) or SVG rendered client-side (lighter, might not preview in WhatsApp)? Default proposal: **server-side PNG via `satori` + `@resvg/resvg-wasm`** — both Worker-safe.
 
 If both defaults are fine, say "go" and I'll build Track 7 then Track 8.
+
+---
+
+## Track 7 + 8 IMPLEMENTED
+
+**Track 7 (Share flow):**
+- `public_reports` table + `investigations.public_slug` — migrated with owner-scoped RLS
+- `src/lib/share.functions.ts` — createPublicReport / getPublicReport / listRecentPublicReports
+- `src/routes/r.$slug.tsx` — public read-only report page with dynamic OG tags
+- `src/routes/api.public.card.$slug.tsx` — dynamic SVG share card (1200×630, no wasm deps, cache 1d)
+- `src/components/ShareCompletionCard.tsx` — WhatsApp/Telegram/copy/native-share buttons rendered after every investigation
+- QR code embedded on PDF cover pointing to /r/<slug> — pure-JS `qrcode` package (Worker-safe)
+- Landing page "Recently shared" strip pulls last 6 public reports
+
+**Track 8 (Community seed + confidence):**
+- 118 hashed scam-indicator rows seeded into `global_signals` (emails: 24, phones: 20, domains: 32, payment_handles: 20, offer_patterns: 22). Reproducible via `node ml/seed_global_signals.mjs`
+- `src/lib/confidence.ts` — deterministic ±band from ensemble disagreement + evidence completeness + community hits
+- Confidence band shown on score badge ("42 ± 8") + range line + tooltip reason
+- Band also written into `public_reports` snapshot and rendered on /r/<slug>
+- Band appears on PDF cover (Confidence range: X–Y (±Z))
+
+Design decisions vs plan:
+- Share card generated as SVG served from `/api/public/card/<slug>` instead of PNG-in-storage — public buckets are blocked on Lovable Cloud and SVG previews correctly in Twitter/Slack/Telegram. WhatsApp fallback is fine (it displays the OG title/description).
+- Auth pipeline (`pipeline.functions.ts`) doesn't auto-publish yet — signed-in users still get band + confidence UI but not the auto-share. Deferred; guest flow is where the viral loop lives.
+- No adversarial-testing script this sprint (deferred to viva prep).
+
