@@ -12,6 +12,7 @@ import {
   Download,
 } from "lucide-react";
 import { listRecentPublicReports } from "@/lib/share.functions";
+import { CHROME_STORE_URL, CHROME_EXTENSION_ZIP_PATH } from "@/lib/constants";
 
 export const Route = createFileRoute("/")({
   ssr: false,
