@@ -1076,6 +1076,224 @@ function VItem({
   );
 }
 
+function severityColor(sev: "info" | "warning" | "critical") {
+  if (sev === "critical") return "text-rose-400 bg-rose-500/10 border-rose-500/30";
+  if (sev === "warning") return "text-amber-400 bg-amber-500/10 border-amber-500/30";
+  return "text-primary bg-primary/10 border-primary/30";
+}
+
+function IdentityGraphCard({ graph }: { graph: IdentityGraph }) {
+  const grouped: Record<string, typeof graph.nodes> = {};
+  graph.nodes.forEach((n) => {
+    (grouped[n.kind] ??= []).push(n);
+  });
+  const suspiciousEdges = graph.edges.filter((e) => e.suspicious);
+  return (
+    <div className="glass overflow-hidden rounded-2xl">
+      <div className="border-b border-border/60 bg-surface/60 px-6 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Network className="h-4 w-4 text-primary" /> Recruiter Identity Graph
+          <span className="text-xs font-normal text-muted-foreground">
+            · {graph.nodes.length} nodes · {graph.edges.length} links
+          </span>
+        </div>
+      </div>
+      <div className="p-6">
+        <p className="text-sm text-muted-foreground">{graph.summary}</p>
+
+        {Object.keys(grouped).length > 0 && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {Object.entries(grouped).map(([kind, nodes]) => (
+              <div key={kind} className="rounded-md border border-border/60 bg-surface/40 p-3">
+                <div className="mb-1.5 flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <Users className="h-3 w-3" /> {kind} · {nodes.length}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nodes.slice(0, 12).map((n) => (
+                    <span
+                      key={n.id}
+                      className="rounded-full bg-muted px-2 py-0.5 text-[11px]"
+                      title={`Seen in evidence ${n.evidence_refs.join(", ")}`}
+                    >
+                      {n.label}
+                      <span className="ml-1 text-muted-foreground">
+                        ·{n.evidence_refs.length}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {suspiciousEdges.length > 0 && (
+          <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/5 p-3 text-xs">
+            <div className="mb-1 font-medium text-rose-400">
+              {suspiciousEdges.length} suspicious link(s)
+            </div>
+            <ul className="space-y-1">
+              {suspiciousEdges.slice(0, 5).map((e, i) => (
+                <li key={i} className="text-muted-foreground">
+                  <span className="text-foreground">{e.from.split(":")[1]}</span>
+                  <span className="mx-1.5 text-rose-400">→ {e.relation} →</span>
+                  <span className="text-foreground">{e.to.split(":")[1]}</span>
+                  {e.note && <span className="ml-2 opacity-70">({e.note})</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {graph.findings.length > 0 && (
+          <div className="mt-5 space-y-2">
+            {graph.findings.map((f, i) => (
+              <div
+                key={i}
+                className={`rounded-md border p-3 text-sm ${severityColor(f.severity)}`}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="font-medium">{f.title}</div>
+                  <div className="text-[10px] uppercase tracking-wide opacity-80">
+                    {f.severity}
+                  </div>
+                </div>
+                <div className="mt-1 text-xs opacity-90">{f.detail}</div>
+                {f.cited_evidence.length > 0 && (
+                  <div className="mt-1 text-[10px] opacity-70">
+                    Evidence #{f.cited_evidence.join(", #")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OfferForensicsCard({ reports }: { reports: OfferForensics[] }) {
+  const verdictColor = (v: OfferForensics["overall_verdict"]) =>
+    v === "high_risk"
+      ? "text-rose-400 bg-rose-500/10 border-rose-500/30"
+      : v === "suspicious"
+        ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+        : v === "likely_authentic"
+          ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+          : "text-muted-foreground bg-muted/40 border-border";
+  return (
+    <div className="glass overflow-hidden rounded-2xl">
+      <div className="border-b border-border/60 bg-surface/60 px-6 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <FileWarning className="h-4 w-4 text-primary" /> Offer Letter Forensics
+          <span className="text-xs font-normal text-muted-foreground">
+            · {reports.length} document{reports.length > 1 ? "s" : ""}
+          </span>
+        </div>
+      </div>
+      <div className="divide-y divide-border/60">
+        {reports.map((r, idx) => (
+          <div key={idx} className="p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <div className="font-medium">{r.filename}</div>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${verdictColor(r.overall_verdict)}`}
+              >
+                {r.overall_verdict.replace("_", " ")}
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              {r.letterhead.claimed_company && (
+                <Stat label="Claimed company" value={r.letterhead.claimed_company} />
+              )}
+              {r.letterhead.signatory_name && (
+                <Stat
+                  label="Signatory"
+                  value={`${r.letterhead.signatory_name}${r.letterhead.signatory_title ? ` · ${r.letterhead.signatory_title}` : ""}`}
+                />
+              )}
+              {r.compensation.stated_amount && (
+                <Stat
+                  label="Compensation"
+                  value={`${r.compensation.stated_amount}${r.compensation.currency ? ` ${r.compensation.currency}` : ""}${r.compensation.period ? ` / ${r.compensation.period}` : ""}`}
+                />
+              )}
+              {r.compensation.salary_plausibility && r.compensation.salary_plausibility !== "unknown" && (
+                <Stat
+                  label="Salary vs market"
+                  value={`${r.compensation.salary_plausibility.replace("_", " ")}${r.compensation.market_band ? ` · ${r.compensation.market_band}` : ""}`}
+                />
+              )}
+              {r.pdf_metadata.producer && (
+                <Stat label="PDF producer" value={r.pdf_metadata.producer} />
+              )}
+              {r.pdf_metadata.creation_date && (
+                <Stat
+                  label="Created"
+                  value={new Date(r.pdf_metadata.creation_date).toLocaleDateString()}
+                />
+              )}
+              {r.pdf_metadata.modification_date && (
+                <Stat
+                  label="Modified"
+                  value={new Date(r.pdf_metadata.modification_date).toLocaleDateString()}
+                />
+              )}
+              <Stat
+                label="Template reuse"
+                value={`${(r.template_reuse_score * 100).toFixed(0)}%`}
+              />
+            </div>
+
+            {r.payment_red_flags.length > 0 && (
+              <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/5 p-3 text-xs">
+                <div className="mb-1 font-medium text-rose-400">Payment red flags</div>
+                <ul className="ml-4 list-disc space-y-0.5 text-muted-foreground">
+                  {r.payment_red_flags.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {r.pdf_metadata.tampered_signals.length > 0 && (
+              <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+                <div className="mb-1 font-medium text-amber-400">PDF metadata signals</div>
+                <ul className="ml-4 list-disc space-y-0.5 text-muted-foreground">
+                  {r.pdf_metadata.tampered_signals.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {r.findings.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {r.findings.map((f, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-md border p-3 text-sm ${severityColor(f.severity)}`}
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="font-medium">{f.title}</div>
+                      <div className="text-[10px] uppercase tracking-wide opacity-80">
+                        {f.severity}
+                      </div>
+                    </div>
+                    <div className="mt-1 text-xs opacity-90">{f.detail}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AuthPrompt({
   intent,
   onClose,
