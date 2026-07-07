@@ -63,6 +63,7 @@ export type GuestResult = {
   confidence: number;
   model_used: string;
   fraud_probability: number;
+  ensemble_breakdown: { lr: number; gbm: number; ensemble: number; threshold: number };
   kaggle_features: KaggleFeatures;
   kaggle_contributions: Record<string, number>;
   weighted_features: Record<string, number>;
