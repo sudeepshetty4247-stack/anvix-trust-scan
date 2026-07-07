@@ -1267,6 +1267,21 @@ function ReportView({
       {n?.disclaimer && (
         <div className="text-center text-xs text-muted-foreground">{n.disclaimer}</div>
       )}
+
+      <GenerateFIRDialog
+        open={firOpen}
+        onClose={() => setFirOpen(false)}
+        caseName={record.name}
+        caseSummary={n?.narrative || r.summary || record.name}
+        evidence={firEvidence}
+        extractedIdentifiers={extractedIdentifiers}
+      />
+      <TrapReplyDialog
+        open={trapOpen}
+        onClose={() => setTrapOpen(false)}
+        caseName={record.name}
+        caseSummary={n?.narrative || r.summary || record.name}
+      />
     </div>
   );
 }
