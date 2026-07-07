@@ -5,6 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { runGuestInvestigation, type GuestResult } from "@/lib/guest.functions";
 import { extractEvidence, type ExtractedEvidence } from "@/lib/evidence.functions";
 import { narrate, type Narrative } from "@/lib/narrative.functions";
+import {
+  analyzeIdentityGraph,
+  analyzeOfferLetter,
+  type IdentityGraph,
+  type OfferForensics,
+} from "@/lib/forensics.functions";
 import { claimGuestInvestigation } from "@/lib/claim.functions";
 import {
   saveGuestCurrent,
