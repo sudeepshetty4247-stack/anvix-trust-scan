@@ -1,120 +1,75 @@
-# Final Polish Sprint — Track 7 + Track 8
-
-You chose "two tracks — winner + supporting." Picking the two highest-leverage gaps:
-
-- **Winner → Track 7: Viral Share Flow** (fixes the "no distribution" gap — the single thing that keeps ANVIX from being useful to skeptics who wouldn't visit a website)
-- **Supporting → Track 8: Community Cold-Start + Model Confidence** (fixes the "empty table on day 1" gap and adds the ±confidence band that makes the score defensible in viva)
-
-Model upgrade to DistilBERT is deferred — it's a 2-day training job and the current ensemble is good enough. Instead, Track 8 adds **calibrated confidence intervals** on top of the existing model, which addresses the "how sure are you?" question without retraining.
+## Goal
+Close the three remaining gaps in one pass: (1) real signal-cloud data, (2) false-positive control for the "verified domain" bonus, (3) Chrome Web Store–ready extension package.
 
 ---
 
-## Track 7 — Viral Share Flow
+## Track 1 — Live data quality (Signal Cloud)
 
-**Goal:** every completed investigation produces a public, read-only report URL that can be pasted into WhatsApp / Telegram / SMS, plus a mobile-first "warning card" image and a QR on the PDF.
+Move the cloud from "seed only" to "self-populating from real investigations" plus a curated real-world seed.
 
-### 7.1 Public read-only report route
-- New DB column `investigations.public_slug` (nullable, unique, 12-char nanoid). Set at completion for signed-in users; guest reports get an ephemeral slug stored in guest storage.
-- New table `public_reports` (denormalized snapshot: slug, verdict, score, confidence_low, confidence_high, top_3_reasons, redacted_contact_fingerprints, created_at, expires_at). Snapshot avoids leaking evidence blobs and freezes the report so re-scoring later doesn't change what was shared. RLS: `TO anon SELECT USING (expires_at > now())`.
-- Route `src/routes/r.$slug.tsx` — server-loaded via `createServerFn` using publishable-key client. Renders a stripped-down public view: verdict badge, score with confidence band, top 3 signals, "This was reported by ANVIX on <date>" watermark. No evidence, no PII, no PDF download for anonymous viewers.
-- Route head sets og:title / og:description / og:image dynamically from the snapshot so link previews in WhatsApp/Telegram show the verdict + score.
+**Backend**
+- Migration: add `contribution_count`, `first_seen_at`, `last_seen_at`, `source` (`user` | `seed` | `curated`) to `global_signals` if missing; add unique index on `(signal_type, signal_value_hash)`.
+- Trigger `after insert on investigation_signals` → upsert into `global_signals`, incrementing `contribution_count` and updating `last_seen_at` (peppered hash, no raw PII).
+- Backfill: one-shot SQL to roll existing `investigation_signals` into `global_signals`.
 
-### 7.2 Share card image (mobile-first)
-- New server function `generateShareCard({slug})` — uses `@vercel/og`-style JSX-to-PNG (or a canvas fallback via the existing `imagegen--edit_image` tool at render time) to produce a 1200×630 PNG: red/amber/green verdict, score, one-line summary, ANVIX watermark.
-- Stored in Supabase Storage bucket `share-cards` (new, public read). URL wired into og:image on the `/r/$slug` route.
-- Completion screen shows the card inline with three buttons: **Copy link**, **Share on WhatsApp** (`https://wa.me/?text=...`), **Share on Telegram** (`https://t.me/share/url?url=...`).
+**Curated real seed**
+- Replace `ml/seed_global_signals.mjs` output with a curated list drawn from public scam feeds (URLhaus, OpenPhish, FTC scam-job bulletins) — ~2–3k rows, tagged `source='curated'`, dated.
+- Insert via `supabase--insert` (data, not schema).
 
-### 7.3 QR on PDF
-- In `src/lib/report-pdf.ts`, add a QR code (using `qrcode` npm package, pure-JS, Worker-safe) on the cover page pointing to the public `/r/$slug` URL. Caption: "Scan to verify this report online."
-- Adds credibility: the recipient (parent / friend) can verify the PDF wasn't tampered with by scanning.
-
-### 7.4 Landing page nudge
-- New section on `src/routes/index.tsx` under Signal Cloud: "Recently shared warnings" — pulls the last 6 public reports (verdict + first 4 chars of slug), each linking to its `/r/$slug`. Turns the community layer visible and creates social proof.
+**UI**
+- Landing "Signal Cloud" stays removed (per your last request). Instead surface density inside the investigation result: a small "Seen by community: N reports in last 30d" chip next to each matched signal — pulled from `global_signals.contribution_count`.
 
 ---
 
-## Track 8 — Community Cold-Start + Model Confidence
+## Track 2 — False-positive control (verified-domain bonus)
 
-**Goal:** `global_signals` starts warm on day one, and every score ships with a ±confidence band.
+Give the ML score a real legitimate-offer benchmark so the domain bonus is tuned, not guessed.
 
-### 8.1 Seed script for global_signals
-- New file `ml/seed_global_signals.py` — pulls from three public sources:
-  1. **CERT-In / MHA cybercrime alert bulletins** (publicly published scam phone numbers and payment handles for job-fraud advisories)
-  2. **Public GitHub scam-blocklist repos** (e.g. `mitchellkrogza/Phishing.Database`, `PhishTank` domain dumps — filtered to job/recruitment keywords)
-  3. **Kaggle "Fake Job Postings" dataset contact fields** (emails and domains from the label=fraud rows)
-- Deduplicates, applies the same peppered SHA-256 hash as the live code path, upserts ~2000-5000 rows into `global_signals` with `source='seed_v1'` and `severity` calibrated per source.
-- New Supabase migration inserts a marker row so future seeds are idempotent.
-- Run once via `code--exec`; result: any investigation on day 1 has a real chance of hitting "previously reported."
+**Dataset**
+- New file `ml/legit_offers.jsonl`: ~200 hand-labeled real offers (LinkedIn, Greenhouse, Lever, Workday, company career pages). Fields: `text`, `domain`, `label='legit'`.
+- Combine with existing Kaggle scam set → `ml/eval_mixed.jsonl`.
 
-### 8.2 Score confidence intervals
-- New file `src/lib/confidence.ts` — computes a ±band from three inputs:
-  1. **Ensemble disagreement**: `|LR_prob - GBM_prob|` mapped to 0-15 point band (models disagree → wider band).
-  2. **Evidence completeness**: missing categories (no email, no offer letter, no company) each widen the band by 3 points.
-  3. **Community signal density**: matches in `global_signals` narrow the band (real reports = higher certainty).
-- Formula: `band = clamp(base(5) + 15*disagreement + 3*missing - 5*community_hits, min=3, max=25)`.
-- Wired into scoring output: `{ score, confidence_low, confidence_high, band_reason }`.
-- UI: score badge shows "42 ± 8" instead of "42"; hover/tap reveals `band_reason` ("Models agreed strongly. Missing email evidence widened band by 3.").
-- Also written into `public_reports` snapshot and rendered on `/r/$slug`.
+**Evaluation script**
+- `ml/evaluate.mjs`: runs current scoring pipeline over `eval_mixed.jsonl`, outputs confusion matrix, precision/recall at score thresholds 40/60/80, and FP rate specifically on `label='legit'` rows.
+- Sweep `verifiedDomainBonus` across {0, 5, 10, 15, 20} and pick the value minimizing FP while keeping recall ≥ current.
 
-### 8.3 Adversarial sanity check (one-off, not shipped)
-- Run 5 real known-legit offer letters (Google/Microsoft/TCS templates, publicly available) through the pipeline via `code--exec` script. Log scores. If any flag as scam (score < 40), tune the `verified_domain_bonus` weight to fix false positives. Document results in `.lovable/plan.md` for viva defense.
+**Code changes**
+- `src/lib/confidence.ts` (or wherever the bonus lives): move `VERIFIED_DOMAIN_BONUS` to a single named constant with the tuned value + a comment linking to the eval report.
+- Add `ml/EVAL_REPORT.md` with the confusion matrix and chosen threshold — this is what you cite in the viva.
+
+**UI**
+- Result card: when the domain bonus fires, show "Verified employer domain (−N risk)" as an explicit line item so reviewers see why the score dropped.
 
 ---
 
-## Files (create/edit)
+## Track 3 — Chrome Web Store distribution
 
-**Create:**
-- `supabase/migrations/<ts>_public_reports.sql` (table + RLS + storage bucket `share-cards`)
-- `supabase/migrations/<ts>_investigations_slug.sql` (add `public_slug` column)
-- `src/routes/r.$slug.tsx` (public read-only report)
-- `src/lib/share.functions.ts` (`createPublicReport`, `generateShareCard`)
-- `src/lib/confidence.ts` (interval math)
-- `src/components/ShareCompletionCard.tsx` (WhatsApp/Telegram/copy buttons)
-- `ml/seed_global_signals.py` + generated `ml/seed_global_signals.json`
+Make the extension store-submittable and swap the manual ZIP flow for a real listing.
 
-**Edit:**
-- `src/lib/scoring.ts` (return confidence band)
-- `src/lib/report-pdf.ts` (QR code + confidence band on cover)
-- `src/routes/investigate.tsx` (show ShareCompletionCard on success)
-- `src/routes/index.tsx` (Recently shared warnings strip)
-- `src/lib/guest.functions.ts` + `src/lib/investigations.functions.ts` (write snapshot to `public_reports` on completion)
-- `src/integrations/supabase/types.ts` (regenerated)
-- `.lovable/plan.md` (adversarial test log)
+**Extension polish (`/extension`)**
+- `manifest.json`: bump to a clean `1.0.0`, add `homepage_url`, `author`, tighten `permissions` to only what's used (drop `tabs` if `activeTab` suffices), add `host_permissions` array instead of broad `<all_urls>` if possible.
+- Icons: generate 16/32/48/128 PNGs (currently only one icon).
+- `privacy.html` route in the app + link from manifest — Chrome Web Store requires a privacy policy URL.
+- Store screenshots: 1280×800, 3–5 shots of the extension analyzing a real job page.
+- `store-listing.md`: title, short description (132 chars), detailed description, category (`Productivity`), single-purpose declaration.
 
-## Deferred (called out for honesty)
-- DistilBERT fine-tune (2-day GPU job, marginal for demo)
-- Chrome Web Store submission (needs paid developer account)
-- Telegram/WhatsApp bot (share links cover 80% of the value at 5% of the effort)
-- Legitimate-offer false-positive dataset beyond 5 samples (needs human labelers)
+**Packaging**
+- Update the zip script to exclude source maps and the icon source, produce `anvix-scanner-v1.0.0.zip`.
+- Keep the "Load unpacked" flow as fallback; add a "Coming to Chrome Web Store" badge with a placeholder store URL constant (`CHROME_STORE_URL` in `src/lib/constants.ts`) — swap once approved.
 
-## Open question before I build
-- **Public report expiry**: 30 days, 90 days, or never? Longer = better for viva/portfolio ("here's a live link"), shorter = safer if a false positive slips through. Default proposal: **90 days**, extendable by owner if signed in.
-- **Share card image**: PNG generated server-side (heavier, prettier) or SVG rendered client-side (lighter, might not preview in WhatsApp)? Default proposal: **server-side PNG via `satori` + `@resvg/resvg-wasm`** — both Worker-safe.
-
-If both defaults are fine, say "go" and I'll build Track 7 then Track 8.
+**Submission checklist doc**
+- `extension/SUBMISSION.md`: step-by-step of what you (the human) do in the Chrome Developer Dashboard — $5 fee, upload zip, paste description, screenshots, privacy URL, justification for each permission. This is the only step Lovable can't automate.
 
 ---
 
-## Track 7 + 8 IMPLEMENTED
+## Deliverables summary
 
-**Track 7 (Share flow):**
-- `public_reports` table + `investigations.public_slug` — migrated with owner-scoped RLS
-- `src/lib/share.functions.ts` — createPublicReport / getPublicReport / listRecentPublicReports
-- `src/routes/r.$slug.tsx` — public read-only report page with dynamic OG tags
-- `src/routes/api.public.card.$slug.tsx` — dynamic SVG share card (1200×630, no wasm deps, cache 1d)
-- `src/components/ShareCompletionCard.tsx` — WhatsApp/Telegram/copy/native-share buttons rendered after every investigation
-- QR code embedded on PDF cover pointing to /r/<slug> — pure-JS `qrcode` package (Worker-safe)
-- Landing page "Recently shared" strip pulls last 6 public reports
+| Track | New files | Edited files | Migrations |
+|---|---|---|---|
+| Signal cloud | `ml/curated_seed.mjs` | trigger via migration, result card chip | 1 |
+| FP control | `ml/legit_offers.jsonl`, `ml/evaluate.mjs`, `ml/EVAL_REPORT.md` | `src/lib/confidence.ts`, result card | 0 |
+| Extension | 4 icons, `privacy.html` route, `extension/SUBMISSION.md`, `store-listing.md`, screenshots | `manifest.json`, zip script, `src/lib/constants.ts`, extension download UI | 0 |
 
-**Track 8 (Community seed + confidence):**
-- 118 hashed scam-indicator rows seeded into `global_signals` (emails: 24, phones: 20, domains: 32, payment_handles: 20, offer_patterns: 22). Reproducible via `node ml/seed_global_signals.mjs`
-- `src/lib/confidence.ts` — deterministic ±band from ensemble disagreement + evidence completeness + community hits
-- Confidence band shown on score badge ("42 ± 8") + range line + tooltip reason
-- Band also written into `public_reports` snapshot and rendered on /r/<slug>
-- Band appears on PDF cover (Confidence range: X–Y (±Z))
+Total: 1 migration, ~10 new files, ~6 edits. All three tracks land in a single build pass.
 
-Design decisions vs plan:
-- Share card generated as SVG served from `/api/public/card/<slug>` instead of PNG-in-storage — public buckets are blocked on Lovable Cloud and SVG previews correctly in Twitter/Slack/Telegram. WhatsApp fallback is fine (it displays the OG title/description).
-- Auth pipeline (`pipeline.functions.ts`) doesn't auto-publish yet — signed-in users still get band + confidence UI but not the auto-share. Deferred; guest flow is where the viral loop lives.
-- No adversarial-testing script this sprint (deferred to viva prep).
-
+Approve and I'll switch to build mode and ship it.

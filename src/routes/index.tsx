@@ -12,6 +12,7 @@ import {
   Download,
 } from "lucide-react";
 import { listRecentPublicReports } from "@/lib/share.functions";
+import { CHROME_STORE_URL, CHROME_EXTENSION_ZIP_PATH } from "@/lib/constants";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -176,8 +177,9 @@ function RecentlySharedSection() {
 }
 
 function ChromeExtensionSection() {
+  const storeUrl = CHROME_STORE_URL;
   const download = () => {
-    fetch("/anvix-extension.zip")
+    fetch(CHROME_EXTENSION_ZIP_PATH)
       .then((res) => {
         if (!res.ok) throw new Error(`Download failed: ${res.status}`);
         return res.blob();
@@ -185,7 +187,7 @@ function ChromeExtensionSection() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "anvix-extension.zip";
+        a.download = "anvix-scanner-v1.0.0.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
@@ -207,24 +209,42 @@ function ChromeExtensionSection() {
               right-click, and pick <span className="text-foreground">"Investigate with ANVIX"</span>.
               A new tab opens with the evidence already loaded.
             </p>
-            <ol className="mt-4 space-y-1 text-sm text-muted-foreground">
-              <li>1. Download the ZIP below.</li>
-              <li>2. Open <span className="mono">chrome://extensions</span>, toggle Developer mode.</li>
-              <li>3. Click <span className="text-foreground">Load unpacked</span> and select the unzipped folder.</li>
-              <li>4. Highlight any suspicious message and right-click.</li>
-            </ol>
+            {!storeUrl && (
+              <ol className="mt-4 space-y-1 text-sm text-muted-foreground">
+                <li>1. Download the ZIP below.</li>
+                <li>2. Open <span className="mono">chrome://extensions</span>, toggle Developer mode.</li>
+                <li>3. Click <span className="text-foreground">Load unpacked</span> and select the unzipped folder.</li>
+                <li>4. Highlight any suspicious message and right-click.</li>
+              </ol>
+            )}
           </div>
           <div className="flex flex-col items-start gap-3">
             <div className="grid h-16 w-16 place-items-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
               <Chrome className="h-8 w-8 text-primary" />
             </div>
-            <button
-              type="button"
-              onClick={download}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
-              <Download className="h-4 w-4" /> Download extension
-            </button>
+            {storeUrl ? (
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                <Chrome className="h-4 w-4" /> Add to Chrome
+              </a>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={download}
+                  className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+                >
+                  <Download className="h-4 w-4" /> Download extension
+                </button>
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-primary/80">
+                  Chrome Web Store review pending
+                </span>
+              </>
+            )}
             <p className="text-xs text-muted-foreground">
               Works in Chrome, Edge, Brave, Arc, Opera.
             </p>
@@ -234,3 +254,4 @@ function ChromeExtensionSection() {
     </section>
   );
 }
+
