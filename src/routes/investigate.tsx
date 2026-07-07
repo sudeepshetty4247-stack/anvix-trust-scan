@@ -999,6 +999,24 @@ function ReportView({
         </div>
       </section>
 
+      {/* Technical details — collapsed by default */}
+      <section className="glass overflow-hidden rounded-2xl">
+        <button
+          type="button"
+          onClick={() => setTechOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-accent/40"
+          aria-expanded={techOpen}
+        >
+          <div>
+            <div className="text-base font-semibold">Technical details</div>
+            <div className="text-xs text-muted-foreground">
+              Community reports, raw live checks, and every verification. Open only if you want the deep view.
+            </div>
+          </div>
+          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${techOpen ? "rotate-180" : ""}`} />
+        </button>
+        {techOpen && (
+          <div className="space-y-6 border-t border-border px-5 py-5">
       {/* Community intelligence — the network-effect moment */}
       {r.community_signals.length > 0 && (
         <div className="glass overflow-hidden rounded-2xl border border-destructive/40 bg-destructive/5">
