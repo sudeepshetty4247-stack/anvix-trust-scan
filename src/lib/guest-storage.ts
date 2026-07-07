@@ -5,6 +5,7 @@
 import type { GuestResult } from "./guest.functions";
 import type { ExtractedEvidence } from "./evidence.functions";
 import type { Narrative } from "./narrative.functions";
+import type { IdentityGraph, OfferForensics } from "./forensics.functions";
 
 const CURRENT = "anvix:guest:current";
 const HISTORY = "anvix:guest:history";
@@ -12,8 +13,10 @@ const MAX_HISTORY = 20;
 
 export type GuestEvidenceItem = ExtractedEvidence & {
   id: string;
-  preview_data_url?: string; // for images: small preview to render
+  preview_data_url?: string;
   original_size?: number;
+  // Kept transiently for offer-letter forensics; stripped before persistence.
+  pdf_base64?: string;
 };
 
 export type GuestRecord = {
@@ -28,6 +31,8 @@ export type GuestRecord = {
   };
   result: GuestResult;
   narrative?: Narrative;
+  identity_graph?: IdentityGraph;
+  offer_forensics?: OfferForensics[];
 };
 
 const safe = <T>(fn: () => T, fallback: T): T => {
@@ -40,9 +45,16 @@ const safe = <T>(fn: () => T, fallback: T): T => {
 
 export function saveGuestCurrent(rec: GuestRecord) {
   if (typeof window === "undefined") return;
-  safe(() => localStorage.setItem(CURRENT, JSON.stringify(rec)), undefined);
+  const slim: GuestRecord = {
+    ...rec,
+    input: {
+      ...rec.input,
+      evidence: rec.input.evidence.map(({ pdf_base64, ...e }) => e),
+    },
+  };
+  safe(() => localStorage.setItem(CURRENT, JSON.stringify(slim)), undefined);
   const hist = readGuestHistory();
-  const next = [rec, ...hist.filter((h) => h.id !== rec.id)].slice(0, MAX_HISTORY);
+  const next = [slim, ...hist.filter((h) => h.id !== slim.id)].slice(0, MAX_HISTORY);
   safe(() => localStorage.setItem(HISTORY, JSON.stringify(next)), undefined);
 }
 

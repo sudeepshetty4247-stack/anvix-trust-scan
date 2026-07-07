@@ -218,7 +218,91 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     }
   }
 
-  // Findings
+  // Identity Graph
+  if (rec.identity_graph && rec.identity_graph.nodes.length > 0) {
+    drawH2(ctx, "Recruiter Identity Graph");
+    drawParagraph(ctx, rec.identity_graph.summary);
+    ctx.y -= 4;
+    const g = rec.identity_graph;
+    const grouped: Record<string, string[]> = {};
+    g.nodes.forEach((n) => {
+      (grouped[n.kind] ??= []).push(n.label);
+    });
+    Object.entries(grouped).forEach(([kind, labels]) => {
+      drawKV(ctx, kind, labels.join(", "));
+    });
+    const suspicious = g.edges.filter((e) => e.suspicious);
+    if (suspicious.length) {
+      ctx.y -= 4;
+      drawParagraph(ctx, `Suspicious links (${suspicious.length}):`, { bold: true, size: 9 });
+      suspicious.slice(0, 10).forEach((e) =>
+        drawBullet(
+          ctx,
+          `${e.from.split(":")[1]}  →  ${e.relation}  →  ${e.to.split(":")[1]}${e.note ? ` — ${e.note}` : ""}`,
+        ),
+      );
+    }
+    if (g.findings.length) {
+      ctx.y -= 4;
+      drawParagraph(ctx, "Findings:", { bold: true, size: 9 });
+      g.findings.forEach((f) =>
+        drawBullet(ctx, `[${f.severity.toUpperCase()}] ${f.title} — ${f.detail}`),
+      );
+    }
+  }
+
+  // Offer Letter Forensics
+  if (rec.offer_forensics && rec.offer_forensics.length > 0) {
+    drawH2(ctx, "Offer Letter Forensics");
+    rec.offer_forensics.forEach((f) => {
+      drawParagraph(
+        ctx,
+        `${f.filename} — verdict: ${f.overall_verdict.replace("_", " ").toUpperCase()}`,
+        { bold: true },
+      );
+      if (f.letterhead.claimed_company)
+        drawKV(ctx, "Claimed company", f.letterhead.claimed_company);
+      if (f.letterhead.signatory_name)
+        drawKV(
+          ctx,
+          "Signatory",
+          `${f.letterhead.signatory_name}${f.letterhead.signatory_title ? ` · ${f.letterhead.signatory_title}` : ""}`,
+        );
+      if (f.compensation.stated_amount)
+        drawKV(
+          ctx,
+          "Compensation",
+          `${f.compensation.stated_amount}${f.compensation.currency ? ` ${f.compensation.currency}` : ""}${f.compensation.period ? ` / ${f.compensation.period}` : ""} — plausibility: ${f.compensation.salary_plausibility}${f.compensation.market_band ? ` (${f.compensation.market_band})` : ""}`,
+        );
+      if (f.pdf_metadata.producer) drawKV(ctx, "PDF producer", f.pdf_metadata.producer);
+      if (f.pdf_metadata.creator) drawKV(ctx, "PDF creator", f.pdf_metadata.creator);
+      if (f.pdf_metadata.creation_date)
+        drawKV(ctx, "Created", new Date(f.pdf_metadata.creation_date).toLocaleString());
+      if (f.pdf_metadata.modification_date)
+        drawKV(ctx, "Modified", new Date(f.pdf_metadata.modification_date).toLocaleString());
+      drawKV(ctx, "Template reuse", `${(f.template_reuse_score * 100).toFixed(0)}%`);
+      if (f.template_reuse_notes)
+        drawParagraph(ctx, f.template_reuse_notes, { size: 9, color: MUTED });
+      if (f.pdf_metadata.tampered_signals.length) {
+        ctx.y -= 2;
+        drawParagraph(ctx, "PDF metadata signals:", { bold: true, size: 9 });
+        f.pdf_metadata.tampered_signals.forEach((s) => drawBullet(ctx, s));
+      }
+      if (f.payment_red_flags.length) {
+        ctx.y -= 2;
+        drawParagraph(ctx, "Payment red flags:", { bold: true, size: 9 });
+        f.payment_red_flags.forEach((s) => drawBullet(ctx, s));
+      }
+      if (f.findings.length) {
+        ctx.y -= 2;
+        drawParagraph(ctx, "Findings:", { bold: true, size: 9 });
+        f.findings.forEach((fi) =>
+          drawBullet(ctx, `[${fi.severity.toUpperCase()}] ${fi.title} — ${fi.detail}`),
+        );
+      }
+      ctx.y -= 6;
+    });
+  }
   drawH2(ctx, "Positive Findings");
   if (r.positive_findings.length === 0) drawParagraph(ctx, "None.", { color: MUTED });
   else r.positive_findings.forEach((f) => drawBullet(ctx, f));
