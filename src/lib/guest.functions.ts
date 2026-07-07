@@ -1,0 +1,230 @@
+// Public (unauthenticated) server function. Runs the full verification +
+// Kaggle-LR scoring pipeline in-memory. Never touches the DB.
+// Called from /investigate. Guest results live in localStorage only.
+
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import {
+  analyzeText, checkDns, checkEmailAuth, checkWebsite, checkWhois,
+  extractDomain, isFreeEmail, suspiciousTld, type CheckResult,
+} from "./verification.server";
+import { predictFraudProbability, featureContributions, KAGGLE_MODEL, type KaggleFeatures } from "./kaggle-model";
+import { scoreFeatures, type RiskCategory } from "./scoring";
+
+const Input = z.object({
+  name: z.string().trim().min(1).max(200),
+  urls: z.array(z.string().trim()).max(20).default([]),
+  emails: z.array(z.string().trim()).max(20).default([]),
+  text: z.string().max(20000).default(""),
+});
+
+export type GuestVerification = {
+  category: string;
+  check_name: string;
+  status: string;
+  score: number | null;
+  detail: string;
+  data?: unknown;
+};
+
+export type GuestResult = {
+  trust_score: number;
+  risk_category: RiskCategory;
+  confidence: number;
+  model_used: string;
+  fraud_probability: number;
+  kaggle_features: KaggleFeatures;
+  kaggle_contributions: Record<string, number>;
+  weighted_features: Record<string, number>;
+  weighted_score: number;
+  verifications: GuestVerification[];
+  domains: string[];
+  emails: string[];
+  summary: string;
+  positive_findings: string[];
+  negative_findings: string[];
+  missing_evidence: string[];
+  recommendation: string;
+  model_metadata: {
+    trained_on: string;
+    n_rows: number;
+    n_fraud: number;
+    best_model: string;
+    metrics: typeof KAGGLE_MODEL.metrics;
+  };
+};
+
+const FREE_EMAIL_DOMS = new Set(["gmail.com","yahoo.com","outlook.com","hotmail.com","aol.com","icloud.com","protonmail.com","live.com","mail.com"]);
+const SUS_TLDS = [".xyz",".top",".click",".loan",".work",".zip",".mov",".country",".stream",".gq",".ml",".cf",".tk"];
+
+export const runGuestInvestigation = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => Input.parse(d))
+  .handler(async ({ data }) => {
+    const corpus = [data.name, data.text, ...data.urls, ...data.emails].join("\n");
+    const domains = Array.from(new Set([
+      ...data.urls.map(extractDomain).filter((d): d is string => !!d),
+      ...data.emails.map((e) => e.split("@")[1]?.toLowerCase()).filter((d): d is string => !!d),
+    ]));
+
+    const verifications: GuestVerification[] = [];
+    const push = (category: string, name: string, r: CheckResult) => {
+      verifications.push({ category, check_name: name, status: r.status, score: r.score, detail: r.detail, data: r.data });
+    };
+
+    // -- Domain / email / website checks --
+    let dnsScore = 0.5, spf = 0, dmarc = 0, web = 0.5, ssl = 0.5, age = 0.5;
+    let anySusTld = false;
+    for (const [i, domain] of domains.entries()) {
+      const [d, ma, w, wh] = await Promise.all([
+        checkDns(domain), checkEmailAuth(domain), checkWebsite(domain), checkWhois(domain),
+      ]);
+      push("domain", `DNS resolution — ${domain}`, d);
+      push("email",  `SPF record — ${domain}`, ma.spf);
+      push("email",  `DMARC policy — ${domain}`, ma.dmarc);
+      push("website",`Website reachability — ${domain}`, w);
+      push("website",`SSL / HTTPS — ${domain}`, w.ssl);
+      push("domain", `WHOIS / domain age — ${domain}`, wh);
+      if (suspiciousTld(domain)) {
+        anySusTld = true;
+        push("domain", `Suspicious TLD — ${domain}`,
+          { status: "warning", score: 1, detail: `.${domain.split(".").pop()} is common in low-reputation registrations` });
+      }
+      const n = i + 1;
+      dnsScore = ((dnsScore*i)+d.score)/n;
+      spf      = ((spf*i)+ma.spf.score)/n;
+      dmarc    = ((dmarc*i)+ma.dmarc.score)/n;
+      web      = ((web*i)+w.score)/n;
+      ssl      = ((ssl*i)+w.ssl.score)/n;
+      age      = ((age*i)+wh.score)/n;
+    }
+
+    // -- Free-email recruiter --
+    let freeEmailCount = 0;
+    for (const em of data.emails) {
+      if (isFreeEmail(em)) {
+        freeEmailCount++;
+        push("recruiter", `Free-email recruiter — ${em}`,
+          { status: "warning", score: 1, detail: "Legitimate recruiters rarely use free mailbox providers." });
+      }
+    }
+
+    // -- Text analysis --
+    const tx = analyzeText(corpus);
+    push("content","Fraud keyword scan", tx.fraud);
+    push("content","Urgency language", tx.urgency);
+    push("content","Payment / fee request", tx.payment);
+    push("content","Cryptocurrency mention", tx.crypto);
+    push("content","Grammar quality", tx.grammar);
+
+    // -- Cross-source --
+    const officialMatch = data.emails.length && domains.length
+      ? data.emails.some((e) => domains.includes(e.split("@")[1]?.toLowerCase() ?? "")) ? 1 : 0
+      : 0.5;
+    push("evidence","Cross-source consistency",
+      { status: officialMatch === 1 ? "pass" : "warning", score: officialMatch,
+        detail: officialMatch === 1 ? "Recruiter email domain matches website domain" : "Email domain does not match website domain" });
+
+    // -- Kaggle-LR features --
+    const kf: KaggleFeatures = {
+      fraud_keywords_norm: 1 - tx.fraud.score >= 1 ? 0 : Math.min(1, (tx.fraud.data as string[] | undefined)?.length ? (tx.fraud.data as string[]).length/5 : tx.fraud.score),
+      urgency_norm: Math.min(1, ((tx.urgency.data as string[] | undefined)?.length ?? 0)/3),
+      payment_norm: tx.payment.status === "fail" ? 1 : 0,
+      crypto_norm:  tx.crypto.status === "fail" ? 1 : 0,
+      grammar_quality: tx.grammar.score,
+      has_url: data.urls.length > 0 ? 1 : 0,
+      has_email: data.emails.length > 0 ? 1 : 0,
+      free_email_present: data.emails.some((e) => FREE_EMAIL_DOMS.has(e.split("@")[1] ?? "")) ? 1 : 0,
+      sus_tld_present: (anySusTld || SUS_TLDS.some((t) => corpus.toLowerCase().includes(t))) ? 1 : 0,
+      has_company_logo: 0,
+      has_questions: 0,
+      telecommuting: /remote|work.from.home|telecommut/i.test(corpus) ? 1 : 0,
+      has_company_profile: domains.length > 0 && web > 0.5 ? 1 : 0,
+      has_requirements: /require|requirement|qualification|must have/i.test(corpus) ? 1 : 0,
+      has_benefits: /benefit|salary|compensation|bonus|perk/i.test(corpus) ? 1 : 0,
+      desc_len_norm: Math.min(1, corpus.trim().split(/\s+/).length / 500),
+      employment_specified: /full.?time|part.?time|contract|internship|freelance/i.test(corpus) ? 1 : 0,
+    };
+    const pFraud = predictFraudProbability(kf);
+    const kaggleContribs = featureContributions(kf);
+
+    // -- Weighted-baseline for comparison + explainability --
+    const wf = {
+      domain_age: age, ssl_valid: ssl, dns_valid: dnsScore, spf, dmarc,
+      official_email_match: officialMatch, website_reachable: web,
+      fraud_keywords: 1 - tx.fraud.score, payment_request: 1 - tx.payment.score,
+      crypto_mention: 1 - tx.crypto.score, urgency_score: 1 - tx.urgency.score,
+      grammar_quality: tx.grammar.score,
+      evidence_count: Math.min(1, (data.urls.length + data.emails.length + (data.text ? 1 : 0)) / 5),
+      evidence_diversity: Math.min(1, (Number(data.urls.length>0)+Number(data.emails.length>0)+Number(!!data.text)) / 3),
+      cross_source_consistency: officialMatch,
+      suspicious_tld: anySusTld ? 0 : 1,
+      free_email_recruiter: data.emails.length ? 1 - Math.min(1, freeEmailCount / data.emails.length) : 0.5,
+    };
+    const weighted = scoreFeatures(wf);
+
+    // -- Final score: blend Kaggle-LR probability (60%) with weighted baseline (40%) --
+    // LR alone has recall 0.62 but low precision on this dataset — the weighted model corrects that.
+    const trust_from_lr = Math.round((1 - pFraud) * 100);
+    const trust = Math.round(trust_from_lr * 0.6 + weighted.score * 0.4);
+    const category: RiskCategory =
+      trust >= 85 ? "trusted" :
+      trust >= 70 ? "likely_safe" :
+      trust >= 50 ? "caution" :
+      trust >= 30 ? "high_risk" : "fraudulent";
+
+    // -- Explainability text --
+    const negatives: string[] = [];
+    const positives: string[] = [];
+    const missing: string[] = [];
+    if (tx.fraud.status === "fail") negatives.push(`Fraud keywords detected: ${((tx.fraud.data as string[]) ?? []).slice(0,3).join(", ")}`);
+    if (tx.payment.status === "fail") negatives.push("Text asks the candidate for money — classic fraud signal.");
+    if (tx.crypto.status === "fail") negatives.push("Cryptocurrency mentioned in a recruitment context.");
+    if (tx.urgency.status === "warning") negatives.push("Multiple urgency terms — pressure tactic.");
+    if (anySusTld) negatives.push("Domain uses a TLD frequent in scam registrations.");
+    if (kf.free_email_present) negatives.push("Recruiter uses a free-mail provider.");
+    if (age > 0.7) positives.push("Domain is well-established (aged).");
+    if (ssl > 0.7) positives.push("Valid SSL / HTTPS.");
+    if (dnsScore > 0.7) positives.push("Full DNS + MX records present.");
+    if (spf > 0.5) positives.push("SPF configured.");
+    if (dmarc > 0.5) positives.push("DMARC policy present.");
+    if (officialMatch === 1) positives.push("Recruiter email domain matches company website.");
+    if (domains.length === 0) missing.push("No verifiable website / company domain in evidence.");
+    if (data.emails.length === 0) missing.push("No recruiter email supplied.");
+    if (data.text.length < 200) missing.push("Full job description would improve model confidence.");
+
+    const recommendation =
+      trust >= 70 ? "Likely legitimate — proceed with normal caution. Verify identity via a video call on the company's official platform." :
+      trust >= 50 ? "Caution: some signals are weak. Confirm the recruiter through LinkedIn and the company's official careers page before sharing personal data." :
+      trust >= 30 ? "High risk. Do not send ID, bank details, or payments. Independently verify via the company's public HR contact." :
+                    "Likely fraud. Cease contact, do not send documents or money, and report to the platform where you found it.";
+
+    const summary = `ANVIX analyzed "${data.name}" using the Kaggle-LR-v1 model (trained on ${KAGGLE_MODEL.n_rows.toLocaleString()} labeled job postings) and a rule-weighted verification engine. The blended trust score is ${trust}/100 (${category.replace("_"," ")}). The Kaggle model estimated fraud probability at ${(pFraud*100).toFixed(1)}% across ${KAGGLE_MODEL.feature_names.length} engineered features; the verification engine ran ${verifications.length} live checks against ${domains.length} domain(s) and ${data.emails.length} email(s).`;
+
+    const result: GuestResult = {
+      trust_score: trust,
+      risk_category: category,
+      confidence: weighted.confidence,
+      model_used: `ANVIX-Blend-v1 (Kaggle-LR ${(60).toString()}% + Weighted-Baseline 40%)`,
+      fraud_probability: Math.round(pFraud * 10000) / 10000,
+      kaggle_features: kf,
+      kaggle_contributions: Object.fromEntries(Object.entries(kaggleContribs).map(([k,v]) => [k, Math.round(v*1000)/1000])),
+      weighted_features: wf,
+      weighted_score: weighted.score,
+      verifications,
+      domains,
+      emails: data.emails,
+      summary,
+      positive_findings: positives,
+      negative_findings: negatives,
+      missing_evidence: missing,
+      recommendation,
+      model_metadata: {
+        trained_on: KAGGLE_MODEL.trained_on,
+        n_rows: KAGGLE_MODEL.n_rows,
+        n_fraud: KAGGLE_MODEL.n_fraud,
+        best_model: KAGGLE_MODEL.best_model_name,
+        metrics: KAGGLE_MODEL.metrics,
+      },
+    };
+    return result;
+  });
