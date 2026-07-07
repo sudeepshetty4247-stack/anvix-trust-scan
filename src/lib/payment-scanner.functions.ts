@@ -55,6 +55,14 @@ export const checkPaymentIdentifier = createServerFn({ method: "POST" })
     const masked = mask(kind, value);
 
     if (kind === "unknown") {
+      const digitsOnly = data.identifier.replace(/\D/g, "");
+      const nonSeparator = data.identifier.replace(/[\s+-]/g, "");
+      const looksNumeric = digitsOnly.length > 0 && digitsOnly.length === nonSeparator.length;
+      let action =
+        "Paste one of: a UPI ID like name@paytm, a 10-digit phone number, or a 9–18 digit bank account number.";
+      if (looksNumeric && digitsOnly.length < 9) {
+        action = `That looks like a partial number (${digitsOnly.length} digits). Phone numbers are 10 digits and bank accounts are 9–18 digits — paste the full number and try again.`;
+      }
       return {
         kind,
         normalised: value,
@@ -65,8 +73,8 @@ export const checkPaymentIdentifier = createServerFn({ method: "POST" })
         first_seen: null,
         last_seen: null,
         verdict: "no_reports",
-        headline: "We couldn't recognise that as a UPI, bank account, or phone number.",
-        action: "Double-check the format and try again. UPI looks like name@bank, phone is 10 digits, bank account is 9–18 digits.",
+        headline: "That doesn't look like a UPI, phone number, or bank account.",
+        action,
       };
     }
 
