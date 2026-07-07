@@ -27,6 +27,8 @@ import { ActionChecklist } from "@/components/report/ActionChecklist";
 import { NextSteps } from "@/components/report/NextSteps";
 import { createPublicReport } from "@/lib/share.functions";
 import { ShareCompletionCard } from "@/components/ShareCompletionCard";
+import { GenerateFIRDialog } from "@/components/GenerateFIRDialog";
+import { TrapReplyDialog } from "@/components/TrapReplyDialog";
 import {
   ShieldCheck,
   ArrowLeft,
