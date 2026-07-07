@@ -298,18 +298,29 @@ function InvestigationDetail() {
           </section>
         )}
 
-        {/* Rescue Kit: FIR + Trap-reply actions (only for high-risk cases) */}
-        {completed && isHighRisk && (
-          <section className="glass mt-6 rounded-2xl border border-destructive/30 p-5 sm:p-6">
-            <div className="mono text-[11px] uppercase tracking-[0.22em] text-destructive">
+        {/* Rescue Kit: FIR + Trap-reply actions — shown on every completed report */}
+        {completed && (
+          <section
+            className={`glass mt-6 rounded-2xl border p-5 sm:p-6 ${
+              isHighRisk ? "border-destructive/30" : "border-border/70"
+            }`}
+          >
+            <div
+              className={`mono text-[11px] uppercase tracking-[0.22em] ${
+                isHighRisk ? "text-destructive" : "text-primary"
+              }`}
+            >
               ANVIX Rescue Kit
             </div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">
-              Take the next step — fast
+              {isHighRisk
+                ? "Take the next step — fast"
+                : "Tools you can use if this turns out to be a scam"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              If money was lost, file a cybercrime complaint within 24 hours. If the scammer
-              is still messaging you, extract more evidence with a safe reply.
+              {isHighRisk
+                ? "If money was lost, file a cybercrime complaint within 24 hours. If the scammer is still messaging you, extract more evidence with a safe reply."
+                : "Generate a pre-filled cybercrime FIR, or craft a safe reply to extract more evidence from the recruiter."}
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <button
@@ -319,7 +330,7 @@ function InvestigationDetail() {
               >
                 <FileWarning className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                 <div>
-                  <div className="text-sm font-semibold">Generate cybercrime complaint</div>
+                  <div className="text-sm font-semibold">Generate cybercrime complaint (FIR)</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     Pre-filled PDF ready to attach at cybercrime.gov.in
                   </div>
@@ -332,7 +343,7 @@ function InvestigationDetail() {
               >
                 <MessagesSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 <div>
-                  <div className="text-sm font-semibold">Generate a safe reply</div>
+                  <div className="text-sm font-semibold">Generate a safe trap reply</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     3 messages that extract more evidence without spooking them
                   </div>

@@ -160,7 +160,17 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <div className="flex min-h-screen flex-col">
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <footer className="border-t border-border/60 bg-surface/30 py-4 text-center text-xs text-muted-foreground">
+          <span className="mono">
+            Developed by <span className="text-foreground">Swathi P R</span> · ANVIX ©{" "}
+            {new Date().getFullYear()}
+          </span>
+        </footer>
+      </div>
       <Toaster theme="dark" position="top-right" />
     </QueryClientProvider>
   );

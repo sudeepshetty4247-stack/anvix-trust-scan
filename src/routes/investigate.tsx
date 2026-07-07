@@ -513,14 +513,19 @@ function GuestInvestigate() {
             {/* Drop zone */}
             <div
               onClick={() => fileRef.current?.click()}
-              className="glass group cursor-pointer rounded-2xl border border-dashed border-border/70 p-8 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
+              className="glass group relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-primary/40 bg-gradient-to-br from-primary/5 via-surface/40 to-transparent p-10 text-center transition-all hover:border-primary/70 hover:from-primary/10"
             >
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/30">
-                <Upload className="h-5 w-5" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/40 transition-transform group-hover:scale-105">
+                <Upload className="h-7 w-7" />
               </div>
-              <div className="mt-3 text-base font-medium">Click, or drop files here</div>
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className="mt-4 text-lg font-semibold tracking-tight">
+                Click, or drop files here
+              </div>
+              <div className="mt-1.5 text-xs text-muted-foreground">
                 Screenshots · PDF offer letters · Forwarded .eml · Plain .txt — up to 20 items
+              </div>
+              <div className="mono mt-3 inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-widest text-primary/80">
+                <Sparkles className="h-3 w-3" /> AI reads everything automatically
               </div>
               <input
                 ref={fileRef}
