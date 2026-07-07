@@ -68,6 +68,8 @@ function GuestInvestigate() {
   const identityFn = useServerFn(analyzeIdentityGraph);
   const offerFn = useServerFn(analyzeOfferLetter);
   const claimFn = useServerFn(claimGuestInvestigation);
+  const publishFn = useServerFn(createPublicReport);
+
 
   const [evidence, setEvidence] = useState<
     Array<GuestEvidenceItem & { status: UploadStatus; error?: string }>
