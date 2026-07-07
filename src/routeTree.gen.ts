@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as InvestigateRouteImport } from './routes/investigate'
+import { Route as CheckPaymentRouteImport } from './routes/check-payment'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AskRouteImport } from './routes/ask'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
@@ -29,9 +31,19 @@ const InvestigateRoute = InvestigateRouteImport.update({
   path: '/investigate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckPaymentRoute = CheckPaymentRouteImport.update({
+  id: '/check-payment',
+  path: '/check-payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AskRoute = AskRouteImport.update({
+  id: '/ask',
+  path: '/ask',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -67,7 +79,9 @@ const ApiPublicCardSlugRoute = ApiPublicCardSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ask': typeof AskRoute
   '/auth': typeof AuthRoute
+  '/check-payment': typeof CheckPaymentRoute
   '/investigate': typeof InvestigateRoute
   '/privacy': typeof PrivacyRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -77,7 +91,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ask': typeof AskRoute
   '/auth': typeof AuthRoute
+  '/check-payment': typeof CheckPaymentRoute
   '/investigate': typeof InvestigateRoute
   '/privacy': typeof PrivacyRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -89,7 +105,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/ask': typeof AskRoute
   '/auth': typeof AuthRoute
+  '/check-payment': typeof CheckPaymentRoute
   '/investigate': typeof InvestigateRoute
   '/privacy': typeof PrivacyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -101,7 +119,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ask'
     | '/auth'
+    | '/check-payment'
     | '/investigate'
     | '/privacy'
     | '/dashboard'
@@ -111,7 +131,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ask'
     | '/auth'
+    | '/check-payment'
     | '/investigate'
     | '/privacy'
     | '/dashboard'
@@ -122,7 +144,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/ask'
     | '/auth'
+    | '/check-payment'
     | '/investigate'
     | '/privacy'
     | '/_authenticated/dashboard'
@@ -134,7 +158,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AskRoute: typeof AskRoute
   AuthRoute: typeof AuthRoute
+  CheckPaymentRoute: typeof CheckPaymentRoute
   InvestigateRoute: typeof InvestigateRoute
   PrivacyRoute: typeof PrivacyRoute
   RSlugRoute: typeof RSlugRoute
@@ -157,11 +183,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvestigateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/check-payment': {
+      id: '/check-payment'
+      path: '/check-payment'
+      fullPath: '/check-payment'
+      preLoaderRoute: typeof CheckPaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ask': {
+      id: '/ask'
+      path: '/ask'
+      fullPath: '/ask'
+      preLoaderRoute: typeof AskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -225,7 +265,9 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AskRoute: AskRoute,
   AuthRoute: AuthRoute,
+  CheckPaymentRoute: CheckPaymentRoute,
   InvestigateRoute: InvestigateRoute,
   PrivacyRoute: PrivacyRoute,
   RSlugRoute: RSlugRoute,
