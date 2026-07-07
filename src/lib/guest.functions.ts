@@ -396,15 +396,24 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       return acc + Math.min(w, w * Math.log2(1 + s.report_count) / 2);
     }, 0);
     const livePenalty = liveVerification.summary.failed * 4 + liveVerification.summary.warnings * 2;
-    const trust = Math.max(0, Math.min(100, Math.round(base_trust - communityPenalty - livePenalty)));
+    // If the user submitted no real evidence (empty inputs / just a name),
+    // the model has nothing to trust — hard-cap the score so it can't
+    // accidentally read as "safe". Real scams often arrive as a single
+    // sentence with no proof, and those must NOT score in the 40s+.
+    const noEvidencePenalty =
+      data.evidence.length === 0 || aggregatedText.trim().length < 40 ? 40 : 0;
+    const trust = Math.max(
+      0,
+      Math.min(100, Math.round(base_trust - communityPenalty - livePenalty - noEvidencePenalty)),
+    );
     const category: RiskCategory =
       trust >= 85
         ? "trusted"
         : trust >= 70
           ? "likely_safe"
-          : trust >= 50
+          : trust >= 55
             ? "caution"
-            : trust >= 30
+            : trust >= 45
               ? "high_risk"
               : "fraudulent";
 
