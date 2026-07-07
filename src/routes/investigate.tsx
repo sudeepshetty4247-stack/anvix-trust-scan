@@ -854,6 +854,8 @@ function ReportView({
   onDownload,
   saving,
   downloading,
+  isAuthed,
+  saved,
 }: {
   record: GuestRecord;
   onReset: () => void;
@@ -861,6 +863,8 @@ function ReportView({
   onDownload: () => void;
   saving: boolean;
   downloading: boolean;
+  isAuthed: boolean;
+  saved: boolean;
 }) {
   const r = record.result;
   const meta = RISK_META[r.risk_category];
@@ -897,7 +901,7 @@ function ReportView({
           </div>
           <h1 className="mt-1 text-2xl font-semibold">{record.name}</h1>
           <div className="mt-1 text-xs text-muted-foreground">
-            Ran {new Date(record.createdAt).toLocaleString()} · guest session ·{" "}
+            Ran {new Date(record.createdAt).toLocaleString()} · {isAuthed ? "signed in" : "guest session"} ·{" "}
             {record.input.evidence.length} evidence item(s)
           </div>
         </div>
@@ -922,11 +926,11 @@ function ReportView({
           </button>
           <button
             onClick={onSave}
-            disabled={saving}
+            disabled={saving || saved}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
-            Save to history
+            {saved ? "Saved" : "Save to history"}
           </button>
         </div>
       </div>
