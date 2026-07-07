@@ -69,34 +69,12 @@ Same as Option 2, plus a free Google Gemini key so AI works.
 
 **b.** Add it to `.env`:
 ```env
-LOVABLE_API_KEY=<your Gemini key>
+GEMINI_API_KEY=<your Gemini key>
 ```
 
-**c.** Open `src/lib/ai-gateway.server.ts` and change two things at the top:
+**c.** Restart `bun run dev`. The code automatically detects the Gemini key and switches to Google's endpoint, so no file edits are needed.
 
-Change:
-```ts
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-```
-to:
-```ts
-const GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-```
-
-And in the `fetch` call, change the header:
-```ts
-"Lovable-API-Key": key,
-```
-to:
-```ts
-"Authorization": `Bearer ${key}`,
-```
-
-Also change the default model from `google/gemini-2.5-flash` to `gemini-2.5-flash` (drop the `google/` prefix for direct Gemini).
-
-**d.** Restart `bun run dev`. Now AI works too.
-
-Note: some **admin writes** still need `SUPABASE_SERVICE_ROLE_KEY` which you can't get. 95% of user-visible flows are fine without it. For 100% parity you'd have to spin up your own Supabase project (`supabase link` + `supabase db push` all migrations) — a much bigger project. Not worth it for a demo.
+**Note:** some **admin writes** still need `SUPABASE_SERVICE_ROLE_KEY` which you can't get. 95% of user-visible flows are fine without it. For 100% parity you'd have to spin up your own Supabase project (`supabase link` + `supabase db push` all migrations) — a much bigger project. Not worth it for a demo.
 
 ---
 
