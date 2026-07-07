@@ -212,10 +212,13 @@ export const runInvestigation = createServerFn({ method: "POST" })
       dmarc: dmarcScore,
       official_email_match: officialEmailMatch,
       website_reachable: websiteScore,
-      fraud_keywords: 1 - textChecks.fraud.score, // pos: absence of fraud kw
-      payment_request: 1 - textChecks.payment.score,
-      crypto_mention: 1 - textChecks.crypto.score,
-      urgency_score: 1 - textChecks.urgency.score,
+      // Weights for these are NEGATIVE in scoring.ts, so pass the raw
+      // fraud-signal strength (0 = clean, 1 = strong signal). Inverting
+      // here would penalize legit content for the *absence* of fraud.
+      fraud_keywords: textChecks.fraud.score,
+      payment_request: textChecks.payment.score,
+      crypto_mention: textChecks.crypto.score,
+      urgency_score: textChecks.urgency.score,
       grammar_quality: textChecks.grammar.score,
       evidence_count: evidenceCountNorm,
       evidence_diversity: diversity,
