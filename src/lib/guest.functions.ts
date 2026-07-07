@@ -17,6 +17,7 @@ import {
 } from "./verification.server";
 import {
   predictFraudProbability,
+  predictEnsemble,
   featureContributions,
   KAGGLE_MODEL,
   type KaggleFeatures,
