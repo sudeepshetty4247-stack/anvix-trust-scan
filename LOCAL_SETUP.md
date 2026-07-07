@@ -29,11 +29,10 @@ No third-party signup needed. You lose only the AI-generated explanation paragra
   - Windows: `powershell -c "irm bun.sh/install.ps1 | iex"`
 - Git → https://git-scm.com
 
-**2. Get the code**
-In Lovable: **GitHub → Connect to GitHub → Create Repository**, then:
+**2. Get the code from GitHub**
 ```bash
-git clone <your-repo-url>
-cd <your-repo-folder>
+git clone https://github.com/sudeepshetty4247-stack/anvix-lovable.git
+cd anvix-lovable
 bun install
 ```
 
