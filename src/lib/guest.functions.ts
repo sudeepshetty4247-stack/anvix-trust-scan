@@ -401,8 +401,8 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       trust_score: trust,
       risk_category: category,
       confidence: weighted.confidence,
-      model_used: `ANVIX-Blend-v1 (Kaggle-LR 60% + Weighted-Baseline 40%)`,
-      fraud_probability: Math.round(pFraud * 10000) / 10000,
+      model_used: `ANVIX-Blend-v2 (Kaggle-Ensemble LR+GBM 65% + Weighted-Baseline 35%)`,
+      fraud_probability: Math.round(ens.ensemble * 10000) / 10000,
       kaggle_features: kf,
       kaggle_contributions: Object.fromEntries(
         Object.entries(kaggleContribs).map(([k, v]) => [k, Math.round(v * 1000) / 1000]),
