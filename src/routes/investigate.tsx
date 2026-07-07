@@ -888,6 +888,16 @@ function ReportView({
         </div>
       )}
 
+      {/* Recruiter Identity Graph */}
+      {record.identity_graph && record.identity_graph.nodes.length > 0 && (
+        <IdentityGraphCard graph={record.identity_graph} />
+      )}
+
+      {/* Offer Letter Forensics */}
+      {record.offer_forensics && record.offer_forensics.length > 0 && (
+        <OfferForensicsCard reports={record.offer_forensics} />
+      )}
+
       {/* Key evidence + Action */}
       <div className="grid gap-6 lg:grid-cols-2">
         {n?.key_evidence?.length ? (
