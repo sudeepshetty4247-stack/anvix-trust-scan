@@ -223,10 +223,10 @@ export const runInvestigation = createServerFn({ method: "POST" })
       evidence_count: evidenceCountNorm,
       evidence_diversity: diversity,
       cross_source_consistency: crossSource,
-      suspicious_tld: anySuspiciousTld ? 0 : 1,
+      suspicious_tld: anySuspiciousTld ? 1 : 0,
       free_email_recruiter: emails.length
-        ? 1 - Math.min(1, freeEmailRecruiter / emails.length)
-        : 0.5,
+        ? Math.min(1, freeEmailRecruiter / emails.length)
+        : 0,
     };
 
     // ML model interface (deterministic weighted engine calibrated in scoring.ts).

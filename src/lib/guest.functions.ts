@@ -384,10 +384,10 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
           4,
       ),
       cross_source_consistency: officialMatch,
-      suspicious_tld: anySusTld ? 0 : 1,
+      suspicious_tld: anySusTld ? 1 : 0,
       free_email_recruiter: aggregatedEmails.length
-        ? 1 - Math.min(1, freeEmailCount / aggregatedEmails.length)
-        : 0.5,
+        ? Math.min(1, freeEmailCount / aggregatedEmails.length)
+        : 0,
     };
     const weighted = scoreFeatures(wf);
 
