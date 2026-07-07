@@ -1,83 +1,120 @@
-# ANVIX v3 — The "nobody has this" upgrade
+# Final Polish Sprint — Track 7 + Track 8
 
-You picked all 4 leaps and "Pick 2-3". Ranking by *unique impact vs. college-project realism*, I'm proposing these three (the DistilBERT path is deferred — our current ensemble at ROC-AUC 0.87 is already defensible, and encoder upgrades give small user-visible wins for large engineering cost).
+You chose "two tracks — winner + supporting." Picking the two highest-leverage gaps:
 
----
+- **Winner → Track 7: Viral Share Flow** (fixes the "no distribution" gap — the single thing that keeps ANVIX from being useful to skeptics who wouldn't visit a website)
+- **Supporting → Track 8: Community Cold-Start + Model Confidence** (fixes the "empty table on day 1" gap and adds the ±confidence band that makes the score defensible in viva)
 
-## Track 4 — Community Intelligence Layer *(the network-effect story)*
-
-**The pitch:** Every investigation makes the next one smarter. If any past ANVIX user (or a curated seed set) has flagged this recruiter email, phone, WhatsApp number, domain, or salary-band offer, the next user sees it *before* they upload anything else.
-
-**How:**
-- New Supabase table `global_signals(hash, kind, first_seen, last_seen, report_count, severity, sample_context)`. Contacts are stored as SHA-256 hashes with a peppered secret — raw PII never persists.
-- On every completed investigation, hash the extracted emails/phones/domains/recruiter-name+company pairs and upsert with `report_count += 1`.
-- New pipeline step `checkGlobalSignals()` — for each candidate hash, query `global_signals`. If `report_count >= 2` (or seeded blacklist), raise a **"Previously reported"** card at the top of the report with the count and last-seen date.
-- Seed the table with ~500 documented scam contacts from BBB, Trend Micro reports, r/Scams archives, and Indian TRAI DND registry (public CSVs).
-- New "Signal Cloud" chart on the landing page: total reports, unique bad actors, top scam categories this week (live from `global_signals` aggregates).
-
-**Judge story:** *"ANVIX is the only student project where the model improves as more people use it."*
+Model upgrade to DistilBERT is deferred — it's a 2-day training job and the current ensemble is good enough. Instead, Track 8 adds **calibrated confidence intervals** on top of the existing model, which addresses the "how sure are you?" question without retraining.
 
 ---
 
-## Track 5 — Live Recruiter & Company Verification *(answers "is this person real?")*
+## Track 7 — Viral Share Flow
 
-**The pitch:** Right now we score text. Users want to know *"does this recruiter and this company actually exist?"*.
+**Goal:** every completed investigation produces a public, read-only report URL that can be pasted into WhatsApp / Telegram / SMS, plus a mobile-first "warning card" image and a QR on the PDF.
 
-**How, per checkable entity:**
-- **LinkedIn recruiter check** — LinkedIn connector already in the workspace; call `/v2/userinfo` pattern to verify the connected member; use LinkedIn public search-style API to check whether a `name + company` pair returns a real profile. If no match → red flag *"Recruiter not found on LinkedIn."* (LinkedIn's `people search` API is scope-gated; fallback to Google `site:linkedin.com/in "Name" "Company"` via Semrush SERP or a plain fetch of LinkedIn's public HTML preview.)
-- **Company registry check** (parallel, per detected company):
-  - India → MCA21 free lookup (`www.mca.gov.in/mcafoportal/companyLLPMasterData.do`) scraped through a server function; parses CIN, incorporation date, status.
-  - Global → OpenCorporates public API (`api.opencorporates.com/companies/search`) — free tier, 500 req/day, no key needed for basic search.
-  - UK → Companies House public API (free, key-based; user provides via `add_secret` only if needed).
-- **Recruiter photo forensics** — if a screenshot contains a profile picture, extract via Gemini vision (already wired), then compute a perceptual hash (`sharp` isn't available on Workers → use pure-JS `imghash`-style dHash). Compare against a small seed of known-scammer stock photos + cross-check with a Google Reverse Image lookup via SerpAPI-style fetch (Semrush already available; fallback to `images.google.com/searchbyimage` HTML scrape from server fn).
-- **Salary-band plausibility** — send `(role, location, offered_salary)` to Gemini with structured output asking *"Is this offer within 25% of market median?"* Result becomes a forensic signal.
+### 7.1 Public read-only report route
+- New DB column `investigations.public_slug` (nullable, unique, 12-char nanoid). Set at completion for signed-in users; guest reports get an ephemeral slug stored in guest storage.
+- New table `public_reports` (denormalized snapshot: slug, verdict, score, confidence_low, confidence_high, top_3_reasons, redacted_contact_fingerprints, created_at, expires_at). Snapshot avoids leaking evidence blobs and freezes the report so re-scoring later doesn't change what was shared. RLS: `TO anon SELECT USING (expires_at > now())`.
+- Route `src/routes/r.$slug.tsx` — server-loaded via `createServerFn` using publishable-key client. Renders a stripped-down public view: verdict badge, score with confidence band, top 3 signals, "This was reported by ANVIX on <date>" watermark. No evidence, no PII, no PDF download for anonymous viewers.
+- Route head sets og:title / og:description / og:image dynamically from the snapshot so link previews in WhatsApp/Telegram show the verdict + score.
 
-**New UI card:** *"Live Verification"* with pass/fail rows: LinkedIn profile ✓/✗, Company registry ✓/✗, Photo re-used ✓/✗, Salary plausible ✓/✗.
+### 7.2 Share card image (mobile-first)
+- New server function `generateShareCard({slug})` — uses `@vercel/og`-style JSX-to-PNG (or a canvas fallback via the existing `imagegen--edit_image` tool at render time) to produce a 1200×630 PNG: red/amber/green verdict, score, one-line summary, ANVIX watermark.
+- Stored in Supabase Storage bucket `share-cards` (new, public read). URL wired into og:image on the `/r/$slug` route.
+- Completion screen shows the card inline with three buttons: **Copy link**, **Share on WhatsApp** (`https://wa.me/?text=...`), **Share on Telegram** (`https://t.me/share/url?url=...`).
 
-**Judge story:** *"We don't just analyze the message — we independently verify the recruiter and the company exist in the real world."*
+### 7.3 QR on PDF
+- In `src/lib/report-pdf.ts`, add a QR code (using `qrcode` npm package, pure-JS, Worker-safe) on the cover page pointing to the public `/r/$slug` URL. Caption: "Scan to verify this report online."
+- Adds credibility: the recipient (parent / friend) can verify the PDF wasn't tampered with by scanning.
 
----
-
-## Track 6 — Chrome Extension *(the "you'll actually use this" moment)*
-
-**The pitch:** On LinkedIn or Gmail, right-click a suspicious message → *"Investigate with ANVIX"* → new tab opens with evidence pre-filled → one click to run.
-
-**How:**
-- New folder `extension/` with Manifest V3, context-menu entry, and a tiny popup showing "last 5 investigations".
-- Content script scrapes selected text + surrounding context (sender name/email if visible on LinkedIn/Gmail DOM) and posts it to `https://vetting-forge-ai.lovable.app/investigate?intake=<base64-json>`.
-- Add a new URL param handler in `investigate.tsx` that hydrates the intake state from `?intake=` so the user lands with evidence already loaded.
-- Package as ZIP via `nix run nixpkgs#zip`, expose in `public/anvix-extension.zip`, add a **"Install Chrome extension"** section on the landing page with the 4-step install guide and fetch+blob download button.
-- (Stretch, if time) Firefox variant is manifest V2 — skip unless asked; MV3 works on Chrome/Edge/Brave/Arc/Opera.
-
-**Judge story:** Live demo. Right-click a real LinkedIn scam DM, hit Investigate, boom — full report in 8 seconds. *No other student project can do this.*
+### 7.4 Landing page nudge
+- New section on `src/routes/index.tsx` under Signal Cloud: "Recently shared warnings" — pulls the last 6 public reports (verdict + first 4 chars of slug), each linking to its `/r/$slug`. Turns the community layer visible and creates social proof.
 
 ---
 
-## What we're deferring
-- **DistilBERT + LightGBM** — deferred. Current ensemble (ROC-AUC 0.87, F1 0.49) is already presentable. Text-encoder upgrade is high engineering cost for small user-visible win. We can add a *"Roadmap"* slide in the report.
-- **WhatsApp bot** — WhatsApp Business API needs Meta approval (weeks). If you want a messaging surface, we'd substitute a **Telegram bot** (Twilio also works but needs sandbox). Not in this plan — say the word and I'll add a Telegram bot as Track 6b.
+## Track 8 — Community Cold-Start + Model Confidence
+
+**Goal:** `global_signals` starts warm on day one, and every score ships with a ±confidence band.
+
+### 8.1 Seed script for global_signals
+- New file `ml/seed_global_signals.py` — pulls from three public sources:
+  1. **CERT-In / MHA cybercrime alert bulletins** (publicly published scam phone numbers and payment handles for job-fraud advisories)
+  2. **Public GitHub scam-blocklist repos** (e.g. `mitchellkrogza/Phishing.Database`, `PhishTank` domain dumps — filtered to job/recruitment keywords)
+  3. **Kaggle "Fake Job Postings" dataset contact fields** (emails and domains from the label=fraud rows)
+- Deduplicates, applies the same peppered SHA-256 hash as the live code path, upserts ~2000-5000 rows into `global_signals` with `source='seed_v1'` and `severity` calibrated per source.
+- New Supabase migration inserts a marker row so future seeds are idempotent.
+- Run once via `code--exec`; result: any investigation on day 1 has a real chance of hitting "previously reported."
+
+### 8.2 Score confidence intervals
+- New file `src/lib/confidence.ts` — computes a ±band from three inputs:
+  1. **Ensemble disagreement**: `|LR_prob - GBM_prob|` mapped to 0-15 point band (models disagree → wider band).
+  2. **Evidence completeness**: missing categories (no email, no offer letter, no company) each widen the band by 3 points.
+  3. **Community signal density**: matches in `global_signals` narrow the band (real reports = higher certainty).
+- Formula: `band = clamp(base(5) + 15*disagreement + 3*missing - 5*community_hits, min=3, max=25)`.
+- Wired into scoring output: `{ score, confidence_low, confidence_high, band_reason }`.
+- UI: score badge shows "42 ± 8" instead of "42"; hover/tap reveals `band_reason` ("Models agreed strongly. Missing email evidence widened band by 3.").
+- Also written into `public_reports` snapshot and rendered on `/r/$slug`.
+
+### 8.3 Adversarial sanity check (one-off, not shipped)
+- Run 5 real known-legit offer letters (Google/Microsoft/TCS templates, publicly available) through the pipeline via `code--exec` script. Log scores. If any flag as scam (score < 40), tune the `verified_domain_bonus` weight to fix false positives. Document results in `.lovable/plan.md` for viva defense.
 
 ---
 
-## Order I'll build it
-1. **Community intelligence** first — foundational, everything else feeds it (Track 5 verifications become future global signals too).
-2. **Live verification** — LinkedIn connector link + OpenCorporates + MCA + salary plausibility.
-3. **Chrome extension** — thin layer on top, mostly UI + intake URL handler.
+## Files (create/edit)
 
-## New files / changes summary
-- `supabase migration` — `global_signals` table + GRANTs + RLS (public SELECT of aggregates only, service-role INSERT).
-- `src/lib/global-signals.functions.ts` — hash-and-check + upsert on completion.
-- `src/lib/verification-live.functions.ts` — LinkedIn, MCA, OpenCorporates, salary-plausibility calls.
-- `src/lib/image-hash.ts` — pure-JS dHash for recruiter photos.
-- `src/routes/investigate.tsx` — new "Previously reported" + "Live Verification" cards, `?intake=` handler.
-- `src/routes/index.tsx` — Signal Cloud stats section + Chrome-extension install block.
-- `extension/manifest.json`, `extension/background.js`, `extension/content.js`, `extension/popup.html`.
-- `public/anvix-extension.zip` — packaged output.
-- Data seed script `ml/seed_global_signals.py` — loads public scam contact lists.
-- Report additions: new sections in DOCX (comes in Track 7).
+**Create:**
+- `supabase/migrations/<ts>_public_reports.sql` (table + RLS + storage bucket `share-cards`)
+- `supabase/migrations/<ts>_investigations_slug.sql` (add `public_slug` column)
+- `src/routes/r.$slug.tsx` (public read-only report)
+- `src/lib/share.functions.ts` (`createPublicReport`, `generateShareCard`)
+- `src/lib/confidence.ts` (interval math)
+- `src/components/ShareCompletionCard.tsx` (WhatsApp/Telegram/copy buttons)
+- `ml/seed_global_signals.py` + generated `ml/seed_global_signals.json`
 
-## Open decisions before I start
-- **LinkedIn recruiter check** — do you want me to link the LinkedIn connector now (needs your workspace to have it linked; if not, I'll fall back to the public-Google-scrape route which is scrappier but works with zero setup)?
-- **Seed data** — OK to seed `global_signals` with public scam-contact CSVs I fetch from BBB / r/scams archives so the network-effect feels populated on Day 1?
+**Edit:**
+- `src/lib/scoring.ts` (return confidence band)
+- `src/lib/report-pdf.ts` (QR code + confidence band on cover)
+- `src/routes/investigate.tsx` (show ShareCompletionCard on success)
+- `src/routes/index.tsx` (Recently shared warnings strip)
+- `src/lib/guest.functions.ts` + `src/lib/investigations.functions.ts` (write snapshot to `public_reports` on completion)
+- `src/integrations/supabase/types.ts` (regenerated)
+- `.lovable/plan.md` (adversarial test log)
 
-I'll proceed with defaults if you just say "go".
+## Deferred (called out for honesty)
+- DistilBERT fine-tune (2-day GPU job, marginal for demo)
+- Chrome Web Store submission (needs paid developer account)
+- Telegram/WhatsApp bot (share links cover 80% of the value at 5% of the effort)
+- Legitimate-offer false-positive dataset beyond 5 samples (needs human labelers)
+
+## Open question before I build
+- **Public report expiry**: 30 days, 90 days, or never? Longer = better for viva/portfolio ("here's a live link"), shorter = safer if a false positive slips through. Default proposal: **90 days**, extendable by owner if signed in.
+- **Share card image**: PNG generated server-side (heavier, prettier) or SVG rendered client-side (lighter, might not preview in WhatsApp)? Default proposal: **server-side PNG via `satori` + `@resvg/resvg-wasm`** — both Worker-safe.
+
+If both defaults are fine, say "go" and I'll build Track 7 then Track 8.
+
+---
+
+## Track 7 + 8 IMPLEMENTED
+
+**Track 7 (Share flow):**
+- `public_reports` table + `investigations.public_slug` — migrated with owner-scoped RLS
+- `src/lib/share.functions.ts` — createPublicReport / getPublicReport / listRecentPublicReports
+- `src/routes/r.$slug.tsx` — public read-only report page with dynamic OG tags
+- `src/routes/api.public.card.$slug.tsx` — dynamic SVG share card (1200×630, no wasm deps, cache 1d)
+- `src/components/ShareCompletionCard.tsx` — WhatsApp/Telegram/copy/native-share buttons rendered after every investigation
+- QR code embedded on PDF cover pointing to /r/<slug> — pure-JS `qrcode` package (Worker-safe)
+- Landing page "Recently shared" strip pulls last 6 public reports
+
+**Track 8 (Community seed + confidence):**
+- 118 hashed scam-indicator rows seeded into `global_signals` (emails: 24, phones: 20, domains: 32, payment_handles: 20, offer_patterns: 22). Reproducible via `node ml/seed_global_signals.mjs`
+- `src/lib/confidence.ts` — deterministic ±band from ensemble disagreement + evidence completeness + community hits
+- Confidence band shown on score badge ("42 ± 8") + range line + tooltip reason
+- Band also written into `public_reports` snapshot and rendered on /r/<slug>
+- Band appears on PDF cover (Confidence range: X–Y (±Z))
+
+Design decisions vs plan:
+- Share card generated as SVG served from `/api/public/card/<slug>` instead of PNG-in-storage — public buckets are blocked on Lovable Cloud and SVG previews correctly in Twitter/Slack/Telegram. WhatsApp fallback is fine (it displays the OG title/description).
+- Auth pipeline (`pipeline.functions.ts`) doesn't auto-publish yet — signed-in users still get band + confidence UI but not the auto-share. Deferred; guest flow is where the viral loop lives.
+- No adversarial-testing script this sprint (deferred to viva prep).
+

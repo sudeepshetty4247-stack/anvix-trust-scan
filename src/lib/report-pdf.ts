@@ -3,6 +3,7 @@
 // (see /investigate download flow).
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import QRCode from "qrcode";
 import type { GuestRecord } from "./guest-storage";
 
 const M = 48; // page margin
@@ -165,9 +166,41 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     { x: M + 140, y: ctx.y - 26, size: 9, font, color: MUTED },
   );
   ctx.page.drawText(
-    `Weighted baseline: ${r.weighted_score}/100  ·  Confidence: ${(r.confidence * 100).toFixed(0)}%`,
+    `Weighted baseline: ${r.weighted_score}/100  ·  Confidence range: ${r.confidence_band.low}–${r.confidence_band.high} (±${r.confidence_band.band})`,
     { x: M + 140, y: ctx.y - 40, size: 9, font, color: MUTED },
   );
+
+  // QR to public report on the right side of the score block.
+  if (rec.public_slug) {
+    try {
+      const publicUrl = `https://vetting-forge-ai.lovable.app/r/${rec.public_slug}`;
+      const dataUrl = await QRCode.toDataURL(publicUrl, {
+        margin: 0,
+        width: 300,
+        color: { dark: "#0f172a", light: "#ffffff" },
+      });
+      const b64 = dataUrl.split(",")[1] ?? "";
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const png = await doc.embedPng(bytes);
+      const size = 68;
+      ctx.page.drawImage(png, {
+        x: PAGE_W - M - size,
+        y: ctx.y - size + 4,
+        width: size,
+        height: size,
+      });
+      ctx.page.drawText("Scan to verify online", {
+        x: PAGE_W - M - size,
+        y: ctx.y - size - 8,
+        size: 7,
+        font,
+        color: MUTED,
+      });
+    } catch (e) {
+      console.warn("QR embed failed", e);
+    }
+  }
+
   ctx.y -= 60;
 
   drawParagraph(ctx, r.summary);

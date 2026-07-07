@@ -188,6 +188,7 @@ export type Database = {
           id: string
           name: string
           progress: number
+          public_slug: string | null
           risk_category: Database["public"]["Enums"]["risk_category"] | null
           status: Database["public"]["Enums"]["investigation_status"]
           trust_score: number | null
@@ -201,6 +202,7 @@ export type Database = {
           id?: string
           name: string
           progress?: number
+          public_slug?: string | null
           risk_category?: Database["public"]["Enums"]["risk_category"] | null
           status?: Database["public"]["Enums"]["investigation_status"]
           trust_score?: number | null
@@ -214,6 +216,7 @@ export type Database = {
           id?: string
           name?: string
           progress?: number
+          public_slug?: string | null
           risk_category?: Database["public"]["Enums"]["risk_category"] | null
           status?: Database["public"]["Enums"]["investigation_status"]
           trust_score?: number | null
@@ -262,6 +265,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ml_predictions_investigation_id_fkey"
+            columns: ["investigation_id"]
+            isOneToOne: false
+            referencedRelation: "investigations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_reports: {
+        Row: {
+          band_reason: string
+          case_name: string
+          confidence_high: number
+          confidence_low: number
+          contact_fingerprints: Json
+          created_at: string
+          expires_at: string
+          investigation_id: string | null
+          slug: string
+          source: string
+          top_reasons: Json
+          trust_score: number
+          verdict: string
+        }
+        Insert: {
+          band_reason?: string
+          case_name: string
+          confidence_high: number
+          confidence_low: number
+          contact_fingerprints?: Json
+          created_at?: string
+          expires_at?: string
+          investigation_id?: string | null
+          slug: string
+          source?: string
+          top_reasons?: Json
+          trust_score: number
+          verdict: string
+        }
+        Update: {
+          band_reason?: string
+          case_name?: string
+          confidence_high?: number
+          confidence_low?: number
+          contact_fingerprints?: Json
+          created_at?: string
+          expires_at?: string
+          investigation_id?: string | null
+          slug?: string
+          source?: string
+          top_reasons?: Json
+          trust_score?: number
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_reports_investigation_id_fkey"
             columns: ["investigation_id"]
             isOneToOne: false
             referencedRelation: "investigations"

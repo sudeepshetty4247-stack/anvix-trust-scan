@@ -33,6 +33,7 @@ export type GuestRecord = {
   narrative?: Narrative;
   identity_graph?: IdentityGraph;
   offer_forensics?: OfferForensics[];
+  public_slug?: string;
 };
 
 const safe = <T>(fn: () => T, fallback: T): T => {

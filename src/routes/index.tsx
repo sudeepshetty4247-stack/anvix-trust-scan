@@ -13,6 +13,7 @@ import {
   Download,
 } from "lucide-react";
 import { getSignalCloud } from "@/lib/global-signals.functions";
+import { listRecentPublicReports } from "@/lib/share.functions";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -118,9 +119,62 @@ function Landing() {
         </section>
 
         <SignalCloudSection />
+        <RecentlySharedSection />
         <ChromeExtensionSection />
       </main>
     </div>
+  );
+}
+
+function RecentlySharedSection() {
+  const [reports, setReports] = useState<
+    Array<{ slug: string; verdict: string; trust_score: number; case_name: string; created_at: string }>
+  >([]);
+  useEffect(() => {
+    listRecentPublicReports().then(setReports).catch(() => setReports([]));
+  }, []);
+  if (reports.length === 0) return null;
+  const tone = (s: number) =>
+    s >= 70 ? "hsl(142 76% 45%)" : s >= 50 ? "hsl(45 90% 55%)" : s >= 30 ? "hsl(24 90% 55%)" : "hsl(0 84% 60%)";
+  return (
+    <section className="pb-16">
+      <div className="mono text-xs uppercase tracking-[0.22em] text-primary/80">
+        Recently shared
+      </div>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+        Public verdicts from the community
+      </h2>
+      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+        Every ANVIX report can be shared as a read-only link — no evidence, no PII, just the verdict.
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {reports.map((r) => (
+          <Link
+            key={r.slug}
+            to="/r/$slug"
+            params={{ slug: r.slug }}
+            className="glass block rounded-xl border border-border/60 p-4 transition hover:border-primary/40"
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+                style={{ background: `${tone(r.trust_score)}18`, color: tone(r.trust_score) }}
+              >
+                {r.verdict.replace("_", " ")}
+              </span>
+              <span
+                className="text-2xl font-semibold tracking-tight"
+                style={{ color: tone(r.trust_score) }}
+              >
+                {r.trust_score}
+              </span>
+            </div>
+            <div className="mt-2 truncate text-sm font-medium">{r.case_name}</div>
+            <div className="mono mt-1 text-[10px] text-muted-foreground">/r/{r.slug}</div>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

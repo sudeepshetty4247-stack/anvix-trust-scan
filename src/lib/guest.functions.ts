@@ -32,6 +32,7 @@ import {
   runLiveVerificationCore,
   type LiveVerificationResult,
 } from "./verification-live.functions";
+import { computeConfidence, type ConfidenceResult } from "./confidence";
 
 const EvidenceItem = z.object({
   kind: z.string(),
@@ -91,6 +92,7 @@ export type GuestResult = {
   verifications_summary: string;
   community_signals: SignalMatch[];
   live_verification: LiveVerificationResult;
+  confidence_band: ConfidenceResult;
   model_metadata: {
     trained_on: string;
     n_rows: number;
@@ -406,6 +408,21 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
               ? "high_risk"
               : "fraudulent";
 
+    // Confidence band (Track 8.2)
+    const confidence_band = computeConfidence({
+      trust_score: trust,
+      lr: ens.lr,
+      gbm: ens.gbm,
+      evidence_present: {
+        url: aggregatedUrls.length > 0,
+        email: aggregatedEmails.length > 0,
+        offer_pdf: data.evidence.some((e) => /pdf/i.test(e.kind)),
+        screenshot: data.evidence.some((e) => /image|screenshot|png|jpg/i.test(e.kind)),
+        text: aggregatedText.length > 100,
+      },
+      community_hits: communitySignals.length,
+    });
+
     // -- Explainability text --
     const negatives: string[] = [];
     const positives: string[] = [];
@@ -489,6 +506,7 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       verifications_summary,
       community_signals: communitySignals,
       live_verification: liveVerification,
+      confidence_band,
       model_metadata: {
         trained_on: KAGGLE_MODEL.trained_on,
         n_rows: KAGGLE_MODEL.n_rows,
