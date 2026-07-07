@@ -19,7 +19,7 @@ type Prediction = {
   prediction_score: number | string;
   confidence: number | string;
   risk_category: string;
-  feature_importance?: Record<string, number> | null;
+  feature_importance?: unknown;
 };
 
 type Report = {
