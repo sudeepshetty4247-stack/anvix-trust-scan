@@ -57,6 +57,40 @@ const SYSTEM = `You are ANVIX, a senior recruitment-fraud investigator. You expl
 export const narrate = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<Narrative> => {
+    const hasConcreteNegative = data.negative_findings.length > 0;
+    if (data.trust_score >= 55 && !hasConcreteNegative) {
+      const positives = data.positive_findings.slice(0, 5);
+      return {
+        headline:
+          data.trust_score >= 70
+            ? "This looks consistent with a legitimate recruitment message."
+            : "This needs normal recruiter verification, not a scam verdict.",
+        narrative:
+          data.trust_score >= 70
+            ? `The evidence has several legitimate signals and no concrete fraud indicators were detected. Continue through the company's official careers page and verified company channels.`
+            : `The evidence does not contain a payment request, cryptocurrency request, free-mail recruiter, or other concrete scam signal. Because some verification signals are still incomplete, verify the recruiter through the company's official careers page before sharing personal information.`,
+        key_evidence: positives.length
+          ? positives.map((p) => `Evidence: ${p}`)
+          : ["Evidence: no concrete fraud indicator was detected in the submitted material."],
+        playbook: {
+          playbook_id: null,
+          playbook_name: null,
+          confidence: 0,
+          matched_signals: [],
+          current_step_index: null,
+          next_move: null,
+          what_to_do: "Verify directly through the official careers page and company email before proceeding.",
+        },
+        next_predicted_asks: [],
+        action_checklist: [
+          "Open the job only from the company's official careers website.",
+          "Confirm the recruiter on an official company profile or verified email thread.",
+          "Do not share ID, bank details, or documents until verification is complete.",
+        ],
+        disclaimer: "This report is informational and does not constitute legal advice.",
+      };
+    }
+
     const evidenceBlock = data.evidence
       .map(
         (e, i) =>

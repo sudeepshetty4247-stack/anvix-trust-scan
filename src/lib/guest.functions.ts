@@ -530,16 +530,20 @@ export const runGuestInvestigation = createServerFn({ method: "POST" })
       },
     };
 
-    // Report new signals to the community (fire-and-forget; best-effort).
-    reportSignalsCore({
-      emails: aggregatedEmails,
-      phones: aggregatedPhones,
-      domains,
-      payment_handles: suspiciousPayments,
-      offer_patterns: offerPatternHits,
-      severity: trust < 30 ? "critical" : trust < 50 ? "high" : trust < 70 ? "warning" : "info",
-      sample_context: data.name.slice(0, 120),
-    }).catch(() => void 0);
+    // Report only concrete high-risk scam indicators. Never seed clean company
+    // domains/emails from caution or safe cases, or future legit checks can be
+    // poisoned by false community matches.
+    if (trust < 50 && (suspiciousPayments.length > 0 || offerPatternHits.length > 0 || freeEmailCount > 0)) {
+      reportSignalsCore({
+        emails: aggregatedEmails.filter((e) => FREE_EMAIL_DOMS.has(e.split("@")[1] ?? "")),
+        phones: aggregatedPhones,
+        domains: anySusTld ? domains : [],
+        payment_handles: suspiciousPayments,
+        offer_patterns: offerPatternHits,
+        severity: trust < 30 ? "critical" : "high",
+        sample_context: data.name.slice(0, 120),
+      }).catch(() => void 0);
+    }
 
     return result;
   });
