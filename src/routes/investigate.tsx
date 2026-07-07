@@ -63,6 +63,8 @@ function GuestInvestigate() {
   const runFn = useServerFn(runGuestInvestigation);
   const extractFn = useServerFn(extractEvidence);
   const narrateFn = useServerFn(narrate);
+  const identityFn = useServerFn(analyzeIdentityGraph);
+  const offerFn = useServerFn(analyzeOfferLetter);
   const claimFn = useServerFn(claimGuestInvestigation);
 
   const [evidence, setEvidence] = useState<
