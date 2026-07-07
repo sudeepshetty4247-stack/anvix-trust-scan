@@ -158,8 +158,9 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
   doc.setSubject("Recruitment Trust & Fraud Intelligence Report");
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const ctx: Ctx = { doc, page: doc.addPage([PAGE_W, PAGE_H]), y: PAGE_H - M, font, bold };
+  const ctx: Ctx = { doc, page: patchPage(doc.addPage([PAGE_W, PAGE_H])), y: PAGE_H - M, font, bold };
   header(ctx);
+
 
   // Title block
   drawH1(ctx, rec.name);
