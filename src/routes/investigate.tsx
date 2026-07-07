@@ -27,6 +27,8 @@ import { ActionChecklist } from "@/components/report/ActionChecklist";
 import { NextSteps } from "@/components/report/NextSteps";
 import { createPublicReport } from "@/lib/share.functions";
 import { ShareCompletionCard } from "@/components/ShareCompletionCard";
+import { GenerateFIRDialog } from "@/components/GenerateFIRDialog";
+import { TrapReplyDialog } from "@/components/TrapReplyDialog";
 import {
   ShieldCheck,
   ArrowLeft,
@@ -54,6 +56,8 @@ import {
   Users,
   FileWarning,
   Network,
+  ChevronDown,
+  MessagesSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -828,6 +832,29 @@ function ReportView({
   const r = record.result;
   const meta = RISK_META[r.risk_category];
   const n = record.narrative;
+  const [firOpen, setFirOpen] = useState(false);
+  const [trapOpen, setTrapOpen] = useState(false);
+  const [techOpen, setTechOpen] = useState(false);
+  const isHighRisk = r.risk_category === "fraudulent" || r.risk_category === "high_risk";
+
+  // Extract identifiers from evidence for the FIR pre-fill.
+  const extractedIdentifiers = {
+    emails: Array.from(new Set(record.input.evidence.flatMap((e) => e.emails ?? []))).slice(0, 10),
+    phones: Array.from(new Set(record.input.evidence.flatMap((e) => e.phones ?? []))).slice(0, 10),
+    upi_or_bank: Array.from(
+      new Set(record.input.evidence.flatMap((e) => e.payment_methods ?? [])),
+    ).slice(0, 10),
+    websites: Array.from(
+      new Set([...(record.input.urls ?? []), ...record.input.evidence.flatMap((e) => e.urls ?? [])]),
+    ).slice(0, 10),
+    names: Array.from(new Set(record.input.evidence.flatMap((e) => e.people ?? []))).slice(0, 10),
+  };
+  const firEvidence = record.input.evidence.map((e) => ({
+    label: e.filename || null,
+    content: e.extracted_text || null,
+    kind: e.kind,
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -919,6 +946,77 @@ function ReportView({
         />
       )}
 
+      {/* Rescue Kit — FIR + Trap Reply, available immediately (no sign-in) */}
+      <section
+        className={`glass rounded-2xl border p-5 sm:p-6 ${
+          isHighRisk ? "border-destructive/30" : "border-border/70"
+        }`}
+      >
+        <div
+          className={`mono text-[11px] uppercase tracking-[0.22em] ${
+            isHighRisk ? "text-destructive" : "text-primary"
+          }`}
+        >
+          ANVIX Rescue Kit
+        </div>
+        <h2 className="mt-1 text-lg font-semibold tracking-tight">
+          {isHighRisk
+            ? "Take the next step — fast"
+            : "Tools you can use if this turns out to be a scam"}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isHighRisk
+            ? "If money was lost, file a cybercrime complaint within 24 hours. If the scammer is still messaging you, extract more evidence with a safe reply."
+            : "Generate a pre-filled cybercrime FIR, or craft a safe reply to extract more evidence from the recruiter."}
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setFirOpen(true)}
+            className="group flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10"
+          >
+            <FileWarning className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <div className="text-sm font-semibold">Generate cybercrime complaint (FIR)</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                Pre-filled PDF ready to attach at cybercrime.gov.in
+              </div>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTrapOpen(true)}
+            className="group flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 text-left hover:bg-primary/10"
+          >
+            <MessagesSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <div className="text-sm font-semibold">Generate a safe trap reply</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                3 messages that extract more evidence without spooking them
+              </div>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      {/* Technical details — collapsed by default */}
+      <section className="glass overflow-hidden rounded-2xl">
+        <button
+          type="button"
+          onClick={() => setTechOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-accent/40"
+          aria-expanded={techOpen}
+        >
+          <div>
+            <div className="text-base font-semibold">Technical details</div>
+            <div className="text-xs text-muted-foreground">
+              Community reports, raw live checks, and every verification. Open only if you want the deep view.
+            </div>
+          </div>
+          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${techOpen ? "rotate-180" : ""}`} />
+        </button>
+        {techOpen && (
+          <div className="space-y-6 border-t border-border px-5 py-5">
       {/* Community intelligence — the network-effect moment */}
       {r.community_signals.length > 0 && (
         <div className="glass overflow-hidden rounded-2xl border border-destructive/40 bg-destructive/5">
@@ -996,6 +1094,11 @@ function ReportView({
           </ul>
         </div>
       )}
+          </div>
+        )}
+      </section>
+
+
 
 
       {/* Playbook match — the wow moment */}
@@ -1133,17 +1236,19 @@ function ReportView({
         </div>
       )}
 
-      {/* Verifications */}
-      <div className="glass rounded-2xl p-6">
-        <div className="mb-3 text-sm font-medium">
-          Live verifications ({r.verifications.length})
+      {/* Verifications — technical, only when accordion is open */}
+      {techOpen && (
+        <div className="glass rounded-2xl p-6">
+          <div className="mb-3 text-sm font-medium">
+            Live verifications ({r.verifications.length})
+          </div>
+          <ul className="divide-y divide-border/60">
+            {r.verifications.map((v, i) => (
+              <VItem key={i} v={v} />
+            ))}
+          </ul>
         </div>
-        <ul className="divide-y divide-border/60">
-          {r.verifications.map((v, i) => (
-            <VItem key={i} v={v} />
-          ))}
-        </ul>
-      </div>
+      )}
 
       {/* Missing */}
       {r.missing_evidence.length > 0 && (
@@ -1162,6 +1267,21 @@ function ReportView({
       {n?.disclaimer && (
         <div className="text-center text-xs text-muted-foreground">{n.disclaimer}</div>
       )}
+
+      <GenerateFIRDialog
+        open={firOpen}
+        onClose={() => setFirOpen(false)}
+        caseName={record.name}
+        caseSummary={n?.narrative || r.summary || record.name}
+        evidence={firEvidence}
+        extractedIdentifiers={extractedIdentifiers}
+      />
+      <TrapReplyDialog
+        open={trapOpen}
+        onClose={() => setTrapOpen(false)}
+        caseName={record.name}
+        caseSummary={n?.narrative || r.summary || record.name}
+      />
     </div>
   );
 }
