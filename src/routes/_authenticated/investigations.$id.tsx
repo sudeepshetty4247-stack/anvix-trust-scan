@@ -107,6 +107,9 @@ function InvestigationDetail() {
     );
   }, [data]);
 
+  const [firOpen, setFirOpen] = useState(false);
+  const [trapOpen, setTrapOpen] = useState(false);
+
   if (!data) {
     return (
       <AppShell>
@@ -121,6 +124,11 @@ function InvestigationDetail() {
   const canRun = inv.status === "draft" || inv.status === "failed";
   const running = ["collecting", "verifying", "scoring", "explaining"].includes(inv.status);
   const completed = inv.status === "completed";
+
+  // Extract scammer identifiers from evidence for the FIR pre-fill.
+  const extractedIdentifiers = extractIdentifiersFromEvidence(evidence);
+  const isHighRisk =
+    inv.risk_category === "fraudulent" || inv.risk_category === "high_risk";
 
   return (
     <AppShell>
