@@ -117,13 +117,15 @@ export function TechnicalAccordion({
                   }
                 />
               </div>
-              {prediction.feature_importance && (
+              {prediction.feature_importance && typeof prediction.feature_importance === "object" && (
                 <div className="mt-3 rounded-lg border border-border/60 p-3">
                   <div className="mono mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
                     Top feature importance
                   </div>
                   <div className="space-y-1.5">
-                    {Object.entries(prediction.feature_importance)
+                    {Object.entries(prediction.feature_importance as Record<string, unknown>)
+                      .map(([k, v]) => [k, Number(v)] as [string, number])
+                      .filter(([, v]) => Number.isFinite(v))
                       .sort((a, b) => b[1] - a[1])
                       .slice(0, 8)
                       .map(([k, v]) => (
