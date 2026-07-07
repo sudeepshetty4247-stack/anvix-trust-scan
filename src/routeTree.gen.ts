@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as InvestigateRouteImport } from './routes/investigate'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -18,6 +19,11 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedInvestigationsIdRouteImport } from './routes/_authenticated/investigations.$id'
 import { Route as ApiPublicCardSlugRouteImport } from './routes/api.public.card.$slug'
 
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InvestigateRoute = InvestigateRouteImport.update({
   id: '/investigate',
   path: '/investigate',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/investigate': typeof InvestigateRoute
+  '/privacy': typeof PrivacyRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/r/$slug': typeof RSlugRoute
   '/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/investigate': typeof InvestigateRoute
+  '/privacy': typeof PrivacyRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/r/$slug': typeof RSlugRoute
   '/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/investigate': typeof InvestigateRoute
+  '/privacy': typeof PrivacyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/r/$slug': typeof RSlugRoute
   '/_authenticated/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
@@ -94,6 +103,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/investigate'
+    | '/privacy'
     | '/dashboard'
     | '/r/$slug'
     | '/investigations/$id'
@@ -103,6 +113,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/investigate'
+    | '/privacy'
     | '/dashboard'
     | '/r/$slug'
     | '/investigations/$id'
@@ -113,6 +124,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/investigate'
+    | '/privacy'
     | '/_authenticated/dashboard'
     | '/r/$slug'
     | '/_authenticated/investigations/$id'
@@ -124,12 +136,20 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   InvestigateRoute: typeof InvestigateRoute
+  PrivacyRoute: typeof PrivacyRoute
   RSlugRoute: typeof RSlugRoute
   ApiPublicCardSlugRoute: typeof ApiPublicCardSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/investigate': {
       id: '/investigate'
       path: '/investigate'
@@ -207,6 +227,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   InvestigateRoute: InvestigateRoute,
+  PrivacyRoute: PrivacyRoute,
   RSlugRoute: RSlugRoute,
   ApiPublicCardSlugRoute: ApiPublicCardSlugRoute,
 }
