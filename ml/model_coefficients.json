@@ -52,9 +52,9 @@
   "intercept": 1.933474,
   "best_model_name": "Ensemble(LR+GBM)",
   "ensemble": {
-    "lr_weight": 0.35,
-    "gbm_weight": 0.65,
-    "threshold": 0.5,
+    "lr_weight": 0.3,
+    "gbm_weight": 0.7,
+    "threshold": 0.4799999999999999,
     "gbm_threshold": 0.31304347826086953
   },
   "metrics": {
@@ -110,19 +110,19 @@
       ]
     },
     "Ensemble": {
-      "accuracy": 0.962,
-      "precision": 0.7534,
-      "recall": 0.3179,
-      "f1": 0.4472,
-      "roc_auc": 0.8318,
+      "accuracy": 0.9597,
+      "precision": 0.6593,
+      "recall": 0.3468,
+      "f1": 0.4545,
+      "roc_auc": 0.8672,
       "confusion": [
         [
-          3385,
-          18
+          3372,
+          31
         ],
         [
-          118,
-          55
+          113,
+          60
         ]
       ]
     }
