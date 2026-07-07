@@ -224,10 +224,25 @@ function GuestInvestigate() {
       const result = (await runFn({
         data: { name: finalName, urls, emails, text: freeText.trim(), evidence: evidencePayload },
       })) as GuestResult;
-      // Narrative + playbook match
-      let narrative: Narrative | undefined;
-      try {
-        narrative = (await narrateFn({
+      // Narrative + Identity Graph + Offer Forensics — run in parallel
+      const evidenceForFn = evidencePayload.map((e) => ({
+        kind: e.kind,
+        filename: e.filename,
+        extracted_text: e.extracted_text,
+        channel: e.channel,
+        urls: e.urls,
+        emails: e.emails,
+        phones: e.phones,
+        people: e.people,
+        companies: e.companies,
+        payment_methods: e.payment_methods,
+        red_flag_notes: e.red_flag_notes,
+      }));
+
+      const pdfEvidence = evidencePayload.filter((e) => e.kind === "pdf" && e.pdf_base64);
+
+      const [narrativeRes, identityRes, forensicsRes] = await Promise.allSettled([
+        narrateFn({
           data: {
             case_name: finalName,
             trust_score: result.trust_score,
@@ -237,22 +252,38 @@ function GuestInvestigate() {
             positive_findings: result.positive_findings,
             negative_findings: result.negative_findings,
             verifications_summary: result.verifications_summary,
-            evidence: evidencePayload.map((e) => ({
-              kind: e.kind,
-              filename: e.filename,
-              extracted_text: e.extracted_text,
-              channel: e.channel,
-              urls: e.urls,
-              emails: e.emails,
-              phones: e.phones,
-              payment_methods: e.payment_methods,
-              red_flag_notes: e.red_flag_notes,
-            })),
+            evidence: evidenceForFn,
           },
-        })) as Narrative;
-      } catch (e) {
-        console.warn("Narrative failed:", e);
-      }
+        }),
+        identityFn({ data: { evidence: evidenceForFn } }),
+        Promise.all(
+          pdfEvidence.map((ev) =>
+            offerFn({
+              data: {
+                filename: ev.filename || "offer.pdf",
+                pdf_base64: ev.pdf_base64!,
+                extracted_text: ev.extracted_text,
+                companies: ev.companies,
+                amounts: ev.amounts,
+                payment_methods: ev.payment_methods,
+                role_hint: "",
+                location_hint: "",
+              },
+            }),
+          ),
+        ),
+      ]);
+
+      const narrative =
+        narrativeRes.status === "fulfilled" ? (narrativeRes.value as Narrative) : undefined;
+      const identity_graph =
+        identityRes.status === "fulfilled" ? (identityRes.value as IdentityGraph) : undefined;
+      const offer_forensics =
+        forensicsRes.status === "fulfilled" ? (forensicsRes.value as OfferForensics[]) : undefined;
+      if (narrativeRes.status === "rejected") console.warn("Narrative failed:", narrativeRes.reason);
+      if (identityRes.status === "rejected") console.warn("Identity graph failed:", identityRes.reason);
+      if (forensicsRes.status === "rejected") console.warn("Offer forensics failed:", forensicsRes.reason);
+
       const rec: GuestRecord = {
         id: crypto.randomUUID(),
         name: finalName,
@@ -260,6 +291,8 @@ function GuestInvestigate() {
         input: { urls, emails, text: freeText.trim(), evidence: evidencePayload },
         result,
         narrative,
+        identity_graph,
+        offer_forensics,
       };
       saveGuestCurrent(rec);
       setRecord(rec);
