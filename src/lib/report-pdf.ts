@@ -121,17 +121,32 @@ function drawH1(ctx: Ctx, text: string) {
   ctx.y -= 22;
 }
 function drawH2(ctx: Ctx, text: string) {
-  ensure(ctx, 24);
-  ctx.y -= 6;
-  ctx.page.drawText(text, { x: M, y: ctx.y, size: 12, font: ctx.bold, color: PRIMARY });
-  ctx.y -= 16;
-  ctx.page.drawLine({
-    start: { x: M, y: ctx.y + 4 },
-    end: { x: PAGE_W - M, y: ctx.y + 4 },
-    thickness: 0.4,
-    color: DIVIDER,
+  ensure(ctx, 30);
+  ctx.y -= 10;
+  // Colored header bar with a left accent stripe.
+  const barH = 20;
+  ctx.page.drawRectangle({
+    x: M,
+    y: ctx.y - barH + 6,
+    width: PAGE_W - M * 2,
+    height: barH,
+    color: rgb(0.96, 0.98, 0.97),
   });
-  ctx.y -= 4;
+  ctx.page.drawRectangle({
+    x: M,
+    y: ctx.y - barH + 6,
+    width: 3,
+    height: barH,
+    color: PRIMARY,
+  });
+  ctx.page.drawText(text.toUpperCase(), {
+    x: M + 12,
+    y: ctx.y - 6,
+    size: 10,
+    font: ctx.bold,
+    color: PRIMARY,
+  });
+  ctx.y -= barH + 4;
 }
 function drawKV(ctx: Ctx, key: string, value: string) {
   ensure(ctx, LINE);
@@ -176,33 +191,75 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
   });
   ctx.y -= 6;
 
-  // Score block
+  // Score block — bordered card with score, band, ensemble breakdown.
   const r = rec.result;
   drawH2(ctx, "Trust Score");
-  ensure(ctx, 40);
-  ctx.page.drawText(`${r.trust_score}`, {
+  ensure(ctx, 96);
+  const cardTop = ctx.y + 4;
+  const cardH = 96;
+  const cardY = cardTop - cardH;
+  // Card background + border.
+  ctx.page.drawRectangle({
     x: M,
-    y: ctx.y - 20,
-    size: 48,
+    y: cardY,
+    width: PAGE_W - M * 2,
+    height: cardH,
+    color: rgb(0.985, 0.99, 0.988),
+    borderColor: DIVIDER,
+    borderWidth: 0.6,
+  });
+  // Left score column with tinted panel.
+  const colW = 150;
+  ctx.page.drawRectangle({
+    x: M,
+    y: cardY,
+    width: colW,
+    height: cardH,
+    color: rgb(0.94, 0.98, 0.96),
+  });
+  ctx.page.drawText(`${r.trust_score}`, {
+    x: M + 16,
+    y: cardTop - 52,
+    size: 46,
     font: bold,
     color: PRIMARY,
   });
-  ctx.page.drawText(`/100`, { x: M + 90, y: ctx.y - 16, size: 14, font, color: MUTED });
-  ctx.page.drawText(r.risk_category.replace("_", " ").toUpperCase(), {
-    x: M + 140,
-    y: ctx.y - 10,
+  ctx.page.drawText(`/100`, {
+    x: M + 16 + bold.widthOfTextAtSize(`${r.trust_score}`, 46) + 4,
+    y: cardTop - 42,
     size: 12,
+    font,
+    color: MUTED,
+  });
+  ctx.page.drawText("TRUST SCORE", {
+    x: M + 16,
+    y: cardTop - 72,
+    size: 8,
+    font: bold,
+    color: MUTED,
+  });
+  // Right details column.
+  const rx = M + colW + 16;
+  ctx.page.drawText(r.risk_category.replace(/_/g, " ").toUpperCase(), {
+    x: rx,
+    y: cardTop - 20,
+    size: 13,
     font: bold,
     color: TEXT,
   });
   ctx.page.drawText(
-    `Ensemble P(fraud): ${(r.ensemble_breakdown.ensemble * 100).toFixed(1)}%  (LR ${(r.ensemble_breakdown.lr * 100).toFixed(0)}% · GBM ${(r.ensemble_breakdown.gbm * 100).toFixed(0)}%)`,
-    { x: M + 140, y: ctx.y - 26, size: 9, font, color: MUTED },
+    `Ensemble P(fraud): ${(r.ensemble_breakdown.ensemble * 100).toFixed(1)}%   (LR ${(r.ensemble_breakdown.lr * 100).toFixed(0)}%  ·  GBM ${(r.ensemble_breakdown.gbm * 100).toFixed(0)}%)`,
+    { x: rx, y: cardTop - 40, size: 9, font, color: TEXT },
   );
   ctx.page.drawText(
-    `Weighted baseline: ${r.weighted_score}/100  ·  Confidence range: ${r.confidence_band.low}–${r.confidence_band.high} (±${r.confidence_band.band})`,
-    { x: M + 140, y: ctx.y - 40, size: 9, font, color: MUTED },
+    `Weighted baseline: ${r.weighted_score}/100`,
+    { x: rx, y: cardTop - 56, size: 9, font, color: MUTED },
   );
+  ctx.page.drawText(
+    `Confidence range: ${r.confidence_band.low}-${r.confidence_band.high}  (+/- ${r.confidence_band.band})`,
+    { x: rx, y: cardTop - 70, size: 9, font, color: MUTED },
+  );
+  ctx.y = cardY - 10;
 
   // QR to public report on the right side of the score block.
   if (rec.public_slug) {
@@ -216,16 +273,14 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
       const b64 = dataUrl.split(",")[1] ?? "";
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       const png = await doc.embedPng(bytes);
-      const size = 68;
-      ctx.page.drawImage(png, {
-        x: PAGE_W - M - size,
-        y: ctx.y - size + 4,
-        width: size,
-        height: size,
-      });
-      ctx.page.drawText("Scan to verify online", {
-        x: PAGE_W - M - size,
-        y: ctx.y - size - 8,
+      const size = 62;
+      // Anchor QR inside the score card at top-right.
+      const qrX = PAGE_W - M - size - 8;
+      const qrY = cardTop - size - 10;
+      ctx.page.drawImage(png, { x: qrX, y: qrY, width: size, height: size });
+      ctx.page.drawText("Scan to verify", {
+        x: qrX,
+        y: qrY - 10,
         size: 7,
         font,
         color: MUTED,
@@ -235,7 +290,7 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     }
   }
 
-  ctx.y -= 60;
+  ctx.y -= 4;
 
   drawParagraph(ctx, r.summary);
   ctx.y -= 6;
