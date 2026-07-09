@@ -234,8 +234,9 @@ export async function checkWebsite(domain: string): Promise<CheckResult & { ssl:
 export async function checkWhois(
   domain: string,
 ): Promise<CheckResult & { ageDays: number | null }> {
-  // RDAP is free, no key, JSON.
-  try {
+  // RDAP is free, no key, JSON. Cached 1h — domain age barely moves.
+  return cached(`whois:${domain}`, 60 * 60_000, async () => {
+   try {
     const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`);
     if (!res.ok)
       return {
