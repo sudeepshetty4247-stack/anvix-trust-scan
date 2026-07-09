@@ -279,14 +279,15 @@ export async function checkWhois(
       ageDays: days,
       data: { created: reg.eventDate },
     };
-  } catch (e) {
-    return {
-      status: "warning",
-      score: 0.3,
-      detail: `WHOIS failed: ${(e as Error).message}`,
-      ageDays: null,
-    };
-  }
+   } catch (e) {
+     return {
+       status: "warning",
+       score: 0.3,
+       detail: `WHOIS failed: ${(e as Error).message}`,
+       ageDays: null,
+     };
+   }
+  });
 }
 
 export function analyzeText(text: string): {
