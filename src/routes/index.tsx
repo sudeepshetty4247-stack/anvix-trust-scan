@@ -214,7 +214,7 @@ function ChromeExtensionSection() {
       .then((blob) => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "anvix-scanner-v1.0.0.zip";
+        a.download = "anvix-scanner-v1.1.0.zip";
         a.click();
         URL.revokeObjectURL(a.href);
       })
