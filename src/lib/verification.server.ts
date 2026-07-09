@@ -117,15 +117,37 @@ export function extractUrls(text: string): string[] {
   return Array.from(new Set(text.match(/https?:\/\/[^\s,"'<>)]+/gi) ?? []));
 }
 
+// ---------- Production hardening: in-memory TTL cache ----------
+// External lookups (Cloudflare DoH, rdap.org, target websites) are the
+// slowest and most fragile part of the pipeline. Rate-limits from these
+// providers would break the app under load. A per-worker LRU-ish cache
+// with a short TTL absorbs bursts, cuts repeat-investigation latency
+// ~10x, and shields us from transient upstream failures. Bounded size
+// prevents unbounded memory growth on long-lived Worker instances.
+const CACHE_MAX = 500;
+const cache = new Map<string, { value: unknown; expires: number }>();
+async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key);
+  const now = Date.now();
+  if (hit && hit.expires > now) return hit.value as T;
+  const value = await fn();
+  if (cache.size >= CACHE_MAX) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey) cache.delete(firstKey);
+  }
+  cache.set(key, { value, expires: now + ttlMs });
+  return value;
+}
+
 async function doh(name: string, type: string): Promise<any> {
-  const res = await fetch(
-    `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
-    {
-      headers: { accept: "application/dns-json" },
-    },
-  );
-  if (!res.ok) throw new Error(`DoH ${type} ${res.status}`);
-  return res.json();
+  return cached(`doh:${type}:${name}`, 10 * 60_000, async () => {
+    const res = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
+      { headers: { accept: "application/dns-json" } },
+    );
+    if (!res.ok) throw new Error(`DoH ${type} ${res.status}`);
+    return res.json();
+  });
 }
 
 export async function checkDns(domain: string): Promise<CheckResult> {
@@ -183,35 +205,38 @@ export async function checkEmailAuth(
 }
 
 export async function checkWebsite(domain: string): Promise<CheckResult & { ssl: CheckResult }> {
-  const url = `https://${domain}`;
-  try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { redirect: "follow", signal: controller.signal });
-    clearTimeout(t);
-    const ok = res.status < 500;
-    return {
-      status: ok ? "pass" : "warning",
-      score: ok ? 1 : 0.4,
-      detail: `Reachable via HTTPS (status ${res.status})`,
-      data: { status: res.status, finalUrl: res.url },
-      ssl: { status: "pass", score: 1, detail: "TLS handshake succeeded" },
-    };
-  } catch (e) {
-    return {
-      status: "fail",
-      score: 0,
-      detail: `Website unreachable: ${(e as Error).message}`,
-      ssl: { status: "fail", score: 0, detail: "TLS/HTTPS handshake failed" },
-    };
-  }
+  return cached(`web:${domain}`, 5 * 60_000, async () => {
+    const url = `https://${domain}`;
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(url, { redirect: "follow", signal: controller.signal });
+      clearTimeout(t);
+      const ok = res.status < 500;
+      return {
+        status: ok ? "pass" : "warning",
+        score: ok ? 1 : 0.4,
+        detail: `Reachable via HTTPS (status ${res.status})`,
+        data: { status: res.status, finalUrl: res.url },
+        ssl: { status: "pass", score: 1, detail: "TLS handshake succeeded" },
+      } as CheckResult & { ssl: CheckResult };
+    } catch (e) {
+      return {
+        status: "fail",
+        score: 0,
+        detail: `Website unreachable: ${(e as Error).message}`,
+        ssl: { status: "fail", score: 0, detail: "TLS/HTTPS handshake failed" },
+      } as CheckResult & { ssl: CheckResult };
+    }
+  });
 }
 
 export async function checkWhois(
   domain: string,
 ): Promise<CheckResult & { ageDays: number | null }> {
-  // RDAP is free, no key, JSON.
-  try {
+  // RDAP is free, no key, JSON. Cached 1h — domain age barely moves.
+  return cached(`whois:${domain}`, 60 * 60_000, async () => {
+   try {
     const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`);
     if (!res.ok)
       return {
@@ -254,14 +279,15 @@ export async function checkWhois(
       ageDays: days,
       data: { created: reg.eventDate },
     };
-  } catch (e) {
-    return {
-      status: "warning",
-      score: 0.3,
-      detail: `WHOIS failed: ${(e as Error).message}`,
-      ageDays: null,
-    };
-  }
+   } catch (e) {
+     return {
+       status: "warning",
+       score: 0.3,
+       detail: `WHOIS failed: ${(e as Error).message}`,
+       ageDays: null,
+     };
+   }
+  });
 }
 
 export function analyzeText(text: string): {
