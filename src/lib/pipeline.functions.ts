@@ -348,19 +348,43 @@ export const runInvestigation = createServerFn({ method: "POST" })
       evidenceCount: evidence.length,
     });
 
+    // Always-on protective checklist — appended regardless of score so users
+    // get "how to overcome" guidance even when the offer letter reads as
+    // completely genuine and no keyword red flags fired.
+    const protective: string[] = [
+      "Independently verify the recruiter on the company's official careers page or LinkedIn — do not use links from the message itself.",
+      "Call the company's published HR number from their real website and confirm the offer, role, and recruiter's name.",
+      "A genuine offer never requires you to pay any amount (registration, training, laptop deposit, security deposit) before joining. If asked, it is a scam.",
+      "Match the sender's email domain to the company's real domain exactly (e.g. name@company.com, not company-hr@gmail.com or careers-company.online).",
+      "Do the interview over an official corporate video platform, not only WhatsApp / Telegram chat.",
+      "Before signing, cross-check the offered salary against Glassdoor / AmbitionBox — figures far above market are a common bait.",
+    ];
+    const enrichedNegative = [...(negative ?? [])];
+    if (brandImpersonation)
+      enrichedNegative.unshift(
+        "Sender / website does not belong to the company named in the message — possible brand impersonation.",
+      );
+    if (lookalikeDomain)
+      enrichedNegative.unshift(
+        "The domain uses a well-known brand name but is not the brand's official domain (lookalike pattern).",
+      );
+
     await supabase.from("trust_reports").insert({
       investigation_id: invId,
       user_id: userId,
       summary,
       positive_findings: positive,
-      negative_findings: negative,
-      missing_evidence: missing,
+      negative_findings: enrichedNegative,
+      missing_evidence: [...(missing ?? []), ...protective],
       recommendation,
       full_report: {
         model: bestModel,
         features,
         importance,
         category,
+        brand_impersonation: brandImpersonation,
+        lookalike_domain: lookalikeDomain,
+        protective_checklist: protective,
         generated_at: new Date().toISOString(),
       },
     });
