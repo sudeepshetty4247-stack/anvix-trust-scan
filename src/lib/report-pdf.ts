@@ -121,17 +121,32 @@ function drawH1(ctx: Ctx, text: string) {
   ctx.y -= 22;
 }
 function drawH2(ctx: Ctx, text: string) {
-  ensure(ctx, 24);
-  ctx.y -= 6;
-  ctx.page.drawText(text, { x: M, y: ctx.y, size: 12, font: ctx.bold, color: PRIMARY });
-  ctx.y -= 16;
-  ctx.page.drawLine({
-    start: { x: M, y: ctx.y + 4 },
-    end: { x: PAGE_W - M, y: ctx.y + 4 },
-    thickness: 0.4,
-    color: DIVIDER,
+  ensure(ctx, 30);
+  ctx.y -= 10;
+  // Colored header bar with a left accent stripe.
+  const barH = 20;
+  ctx.page.drawRectangle({
+    x: M,
+    y: ctx.y - barH + 6,
+    width: PAGE_W - M * 2,
+    height: barH,
+    color: rgb(0.96, 0.98, 0.97),
   });
-  ctx.y -= 4;
+  ctx.page.drawRectangle({
+    x: M,
+    y: ctx.y - barH + 6,
+    width: 3,
+    height: barH,
+    color: PRIMARY,
+  });
+  ctx.page.drawText(text.toUpperCase(), {
+    x: M + 12,
+    y: ctx.y - 6,
+    size: 10,
+    font: ctx.bold,
+    color: PRIMARY,
+  });
+  ctx.y -= barH + 4;
 }
 function drawKV(ctx: Ctx, key: string, value: string) {
   ensure(ctx, LINE);
