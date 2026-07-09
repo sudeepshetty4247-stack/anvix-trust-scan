@@ -273,16 +273,14 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
       const b64 = dataUrl.split(",")[1] ?? "";
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       const png = await doc.embedPng(bytes);
-      const size = 68;
-      ctx.page.drawImage(png, {
-        x: PAGE_W - M - size,
-        y: ctx.y - size + 4,
-        width: size,
-        height: size,
-      });
-      ctx.page.drawText("Scan to verify online", {
-        x: PAGE_W - M - size,
-        y: ctx.y - size - 8,
+      const size = 62;
+      // Anchor QR inside the score card at top-right.
+      const qrX = PAGE_W - M - size - 8;
+      const qrY = cardTop - size - 10;
+      ctx.page.drawImage(png, { x: qrX, y: qrY, width: size, height: size });
+      ctx.page.drawText("Scan to verify", {
+        x: qrX,
+        y: qrY - 10,
         size: 7,
         font,
         color: MUTED,
@@ -292,7 +290,7 @@ export async function generateReportPDF(rec: GuestRecord): Promise<Uint8Array> {
     }
   }
 
-  ctx.y -= 60;
+  ctx.y -= 4;
 
   drawParagraph(ctx, r.summary);
   ctx.y -= 6;
