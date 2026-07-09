@@ -117,15 +117,37 @@ export function extractUrls(text: string): string[] {
   return Array.from(new Set(text.match(/https?:\/\/[^\s,"'<>)]+/gi) ?? []));
 }
 
+// ---------- Production hardening: in-memory TTL cache ----------
+// External lookups (Cloudflare DoH, rdap.org, target websites) are the
+// slowest and most fragile part of the pipeline. Rate-limits from these
+// providers would break the app under load. A per-worker LRU-ish cache
+// with a short TTL absorbs bursts, cuts repeat-investigation latency
+// ~10x, and shields us from transient upstream failures. Bounded size
+// prevents unbounded memory growth on long-lived Worker instances.
+const CACHE_MAX = 500;
+const cache = new Map<string, { value: unknown; expires: number }>();
+async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key);
+  const now = Date.now();
+  if (hit && hit.expires > now) return hit.value as T;
+  const value = await fn();
+  if (cache.size >= CACHE_MAX) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey) cache.delete(firstKey);
+  }
+  cache.set(key, { value, expires: now + ttlMs });
+  return value;
+}
+
 async function doh(name: string, type: string): Promise<any> {
-  const res = await fetch(
-    `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
-    {
-      headers: { accept: "application/dns-json" },
-    },
-  );
-  if (!res.ok) throw new Error(`DoH ${type} ${res.status}`);
-  return res.json();
+  return cached(`doh:${type}:${name}`, 10 * 60_000, async () => {
+    const res = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
+      { headers: { accept: "application/dns-json" } },
+    );
+    if (!res.ok) throw new Error(`DoH ${type} ${res.status}`);
+    return res.json();
+  });
 }
 
 export async function checkDns(domain: string): Promise<CheckResult> {
