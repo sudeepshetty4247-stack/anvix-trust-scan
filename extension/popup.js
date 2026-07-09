@@ -73,3 +73,15 @@ function escape(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[c]);
 }
+
+// Sample scam prefill for first-time users
+document.getElementById("sample")?.addEventListener("click", () => {
+  document.getElementById("evidence").value =
+    "Congratulations! You are selected for Amazon Data Entry work-from-home. Salary Rs 45,000/month. Pay Rs 1,500 registration fee via UPI to hr.amazon.pay@paytm to activate your account. WhatsApp +91 9876543210 for details.";
+  document.getElementById("evidence").focus();
+});
+
+// Live status ping
+fetch("https://anvix-trust-scan.lovable.app/favicon.ico", { mode: "no-cors" })
+  .then(() => { const s = document.getElementById("status"); if (s) { s.textContent = "● live"; s.style.color = "#4ade80"; } })
+  .catch(() => { const s = document.getElementById("status"); if (s) { s.textContent = "● offline"; s.style.color = "#e94560"; } });
