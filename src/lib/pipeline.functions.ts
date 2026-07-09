@@ -160,6 +160,76 @@ export const runInvestigation = createServerFn({ method: "POST" })
       }
     }
 
+    // 3b. Brand impersonation & sender-vs-company mismatch — the #1 tell for
+    // scams that otherwise read as completely genuine (no fee, no urgency,
+    // no crypto). We look for a well-known brand mentioned in the text and
+    // check whether the sender email or website actually belongs to it.
+    const BRANDS: Array<{ name: string; domains: string[] }> = [
+      { name: "Google", domains: ["google.com"] },
+      { name: "Microsoft", domains: ["microsoft.com"] },
+      { name: "Amazon", domains: ["amazon.com", "amazon.in"] },
+      { name: "Meta", domains: ["meta.com", "fb.com"] },
+      { name: "Facebook", domains: ["meta.com", "fb.com"] },
+      { name: "Apple", domains: ["apple.com"] },
+      { name: "Netflix", domains: ["netflix.com"] },
+      { name: "TCS", domains: ["tcs.com"] },
+      { name: "Infosys", domains: ["infosys.com"] },
+      { name: "Wipro", domains: ["wipro.com"] },
+      { name: "Accenture", domains: ["accenture.com"] },
+      { name: "Deloitte", domains: ["deloitte.com"] },
+      { name: "IBM", domains: ["ibm.com"] },
+      { name: "Cognizant", domains: ["cognizant.com"] },
+      { name: "Capgemini", domains: ["capgemini.com"] },
+      { name: "LinkedIn", domains: ["linkedin.com"] },
+    ];
+    const lowerCorpus = corpus.toLowerCase();
+    const allSenderDomains = new Set<string>([
+      ...domains,
+      ...emails.map((e) => e.split("@")[1] ?? ""),
+    ]);
+    let brandImpersonation = false;
+    for (const b of BRANDS) {
+      if (!new RegExp(`\\b${b.name.toLowerCase()}\\b`).test(lowerCorpus)) continue;
+      const legit = [...allSenderDomains].some((d) =>
+        b.domains.some((bd) => d === bd || d.endsWith(`.${bd}`)),
+      );
+      if (allSenderDomains.size > 0 && !legit) {
+        brandImpersonation = true;
+        await addVerification(
+          "recruiter",
+          `Brand mismatch — claims ${b.name}`,
+          {
+            status: "fail",
+            score: 1,
+            detail: `Message references ${b.name} but sender/website (${[...allSenderDomains].filter(Boolean).join(", ")}) is not an official ${b.name} domain (${b.domains.join(", ")}).`,
+          },
+        );
+        break;
+      }
+    }
+
+    // 3c. Lookalike / hyphenated brand domain — "google-hr.online",
+    // "microsoft-careers.co", "tcs-recruitment.site". These pass DNS/SSL
+    // fine yet are almost always fraudulent.
+    let lookalikeDomain = false;
+    for (const d of domains) {
+      for (const b of BRANDS) {
+        const bare = b.name.toLowerCase();
+        const isOfficial = b.domains.some((bd) => d === bd || d.endsWith(`.${bd}`));
+        if (isOfficial) continue;
+        if (new RegExp(`(^|[-.])${bare}([-.]|$)`).test(d)) {
+          lookalikeDomain = true;
+          await addVerification("domain", `Lookalike domain — ${d}`, {
+            status: "fail",
+            score: 1,
+            detail: `Domain "${d}" contains the ${b.name} brand but is not an official ${b.name} domain. This is a common impersonation pattern.`,
+          });
+          break;
+        }
+      }
+      if (lookalikeDomain) break;
+    }
+
     // 4. Text analysis
     await setStatus("verifying", 65);
     await log("Analyzing text content for fraud signals…");
@@ -223,11 +293,20 @@ export const runInvestigation = createServerFn({ method: "POST" })
       evidence_count: evidenceCountNorm,
       evidence_diversity: diversity,
       cross_source_consistency: crossSource,
-      suspicious_tld: anySuspiciousTld ? 1 : 0,
+      suspicious_tld: anySuspiciousTld || lookalikeDomain ? 1 : 0,
       free_email_recruiter: emails.length
         ? Math.min(1, freeEmailRecruiter / emails.length)
         : 0,
     };
+
+    // Silent-scam penalty: brand impersonation or lookalike domain forces
+    // cross-source and official-email-match to 0 so a "clean-looking" offer
+    // letter still lands in caution/high-risk territory. These are the
+    // single strongest tells for polished scams that name-drop big brands.
+    if (brandImpersonation || lookalikeDomain) {
+      features.cross_source_consistency = 0;
+      features.official_email_match = 0;
+    }
 
     // ML model interface (deterministic weighted engine calibrated in scoring.ts).
     // Selected as best model over Random Forest / XGBoost / LightGBM baselines.
@@ -269,19 +348,43 @@ export const runInvestigation = createServerFn({ method: "POST" })
       evidenceCount: evidence.length,
     });
 
+    // Always-on protective checklist — appended regardless of score so users
+    // get "how to overcome" guidance even when the offer letter reads as
+    // completely genuine and no keyword red flags fired.
+    const protective: string[] = [
+      "Independently verify the recruiter on the company's official careers page or LinkedIn — do not use links from the message itself.",
+      "Call the company's published HR number from their real website and confirm the offer, role, and recruiter's name.",
+      "A genuine offer never requires you to pay any amount (registration, training, laptop deposit, security deposit) before joining. If asked, it is a scam.",
+      "Match the sender's email domain to the company's real domain exactly (e.g. name@company.com, not company-hr@gmail.com or careers-company.online).",
+      "Do the interview over an official corporate video platform, not only WhatsApp / Telegram chat.",
+      "Before signing, cross-check the offered salary against Glassdoor / AmbitionBox — figures far above market are a common bait.",
+    ];
+    const enrichedNegative = [...(negative ?? [])];
+    if (brandImpersonation)
+      enrichedNegative.unshift(
+        "Sender / website does not belong to the company named in the message — possible brand impersonation.",
+      );
+    if (lookalikeDomain)
+      enrichedNegative.unshift(
+        "The domain uses a well-known brand name but is not the brand's official domain (lookalike pattern).",
+      );
+
     await supabase.from("trust_reports").insert({
       investigation_id: invId,
       user_id: userId,
       summary,
       positive_findings: positive,
-      negative_findings: negative,
-      missing_evidence: missing,
+      negative_findings: enrichedNegative,
+      missing_evidence: [...(missing ?? []), ...protective],
       recommendation,
       full_report: {
         model: bestModel,
         features,
         importance,
         category,
+        brand_impersonation: brandImpersonation,
+        lookalike_domain: lookalikeDomain,
+        protective_checklist: protective,
         generated_at: new Date().toISOString(),
       },
     });
