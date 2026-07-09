@@ -136,11 +136,21 @@ export const listRecentPublicReports = createServerFn({ method: "GET" }).handler
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(24);
-    // Hide placeholder/empty runs — only surface real named cases.
+    // Hide placeholder / test / channel-shortcut entries — only surface real named cases.
+    const seen = new Set<string>();
     const cleaned = (data ?? []).filter((r) => {
-      const name = (r.case_name ?? "").trim().toLowerCase();
-      return name.length > 0 && name !== "untitled investigation" && name !== "untitled";
+      const raw = (r.case_name ?? "").trim();
+      const name = raw.toLowerCase();
+      if (!name) return false;
+      if (name === "untitled investigation" || name === "untitled") return false;
+      // Drop obvious test/demo runs and channel-name shortcuts like "[WHATSAPP] whatsapp".
+      if (/\btest\b|\bdemo\b|\bsample\b|\bexample\b/.test(name)) return false;
+      if (/^\[[a-z]+\]\s*[a-z]+$/i.test(raw)) return false;
+      // Dedupe by case name so the strip doesn't repeat the same title.
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return true;
     });
-    return cleaned.slice(0, 6);
+    return cleaned.slice(0, 3);
   },
 );
