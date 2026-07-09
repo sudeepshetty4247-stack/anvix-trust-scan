@@ -160,6 +160,76 @@ export const runInvestigation = createServerFn({ method: "POST" })
       }
     }
 
+    // 3b. Brand impersonation & sender-vs-company mismatch — the #1 tell for
+    // scams that otherwise read as completely genuine (no fee, no urgency,
+    // no crypto). We look for a well-known brand mentioned in the text and
+    // check whether the sender email or website actually belongs to it.
+    const BRANDS: Array<{ name: string; domains: string[] }> = [
+      { name: "Google", domains: ["google.com"] },
+      { name: "Microsoft", domains: ["microsoft.com"] },
+      { name: "Amazon", domains: ["amazon.com", "amazon.in"] },
+      { name: "Meta", domains: ["meta.com", "fb.com"] },
+      { name: "Facebook", domains: ["meta.com", "fb.com"] },
+      { name: "Apple", domains: ["apple.com"] },
+      { name: "Netflix", domains: ["netflix.com"] },
+      { name: "TCS", domains: ["tcs.com"] },
+      { name: "Infosys", domains: ["infosys.com"] },
+      { name: "Wipro", domains: ["wipro.com"] },
+      { name: "Accenture", domains: ["accenture.com"] },
+      { name: "Deloitte", domains: ["deloitte.com"] },
+      { name: "IBM", domains: ["ibm.com"] },
+      { name: "Cognizant", domains: ["cognizant.com"] },
+      { name: "Capgemini", domains: ["capgemini.com"] },
+      { name: "LinkedIn", domains: ["linkedin.com"] },
+    ];
+    const lowerCorpus = corpus.toLowerCase();
+    const allSenderDomains = new Set<string>([
+      ...domains,
+      ...emails.map((e) => e.split("@")[1] ?? ""),
+    ]);
+    let brandImpersonation = false;
+    for (const b of BRANDS) {
+      if (!new RegExp(`\\b${b.name.toLowerCase()}\\b`).test(lowerCorpus)) continue;
+      const legit = [...allSenderDomains].some((d) =>
+        b.domains.some((bd) => d === bd || d.endsWith(`.${bd}`)),
+      );
+      if (allSenderDomains.size > 0 && !legit) {
+        brandImpersonation = true;
+        await addVerification(
+          "recruiter",
+          `Brand mismatch — claims ${b.name}`,
+          {
+            status: "fail",
+            score: 1,
+            detail: `Message references ${b.name} but sender/website (${[...allSenderDomains].filter(Boolean).join(", ")}) is not an official ${b.name} domain (${b.domains.join(", ")}).`,
+          },
+        );
+        break;
+      }
+    }
+
+    // 3c. Lookalike / hyphenated brand domain — "google-hr.online",
+    // "microsoft-careers.co", "tcs-recruitment.site". These pass DNS/SSL
+    // fine yet are almost always fraudulent.
+    let lookalikeDomain = false;
+    for (const d of domains) {
+      for (const b of BRANDS) {
+        const bare = b.name.toLowerCase();
+        const isOfficial = b.domains.some((bd) => d === bd || d.endsWith(`.${bd}`));
+        if (isOfficial) continue;
+        if (new RegExp(`(^|[-.])${bare}([-.]|$)`).test(d)) {
+          lookalikeDomain = true;
+          await addVerification("domain", `Lookalike domain — ${d}`, {
+            status: "fail",
+            score: 1,
+            detail: `Domain "${d}" contains the ${b.name} brand but is not an official ${b.name} domain. This is a common impersonation pattern.`,
+          });
+          break;
+        }
+      }
+      if (lookalikeDomain) break;
+    }
+
     // 4. Text analysis
     await setStatus("verifying", 65);
     await log("Analyzing text content for fraud signals…");
