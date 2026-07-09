@@ -163,41 +163,50 @@ function RecentlySharedSection() {
     s >= 70 ? "hsl(142 76% 45%)" : s >= 50 ? "hsl(45 90% 55%)" : s >= 30 ? "hsl(24 90% 55%)" : "hsl(0 84% 60%)";
   return (
     <section className="pb-16">
-      <div className="mono text-xs uppercase tracking-[0.22em] text-primary/80">
-        Recently shared
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <div className="mono text-xs uppercase tracking-[0.22em] text-primary/80">
+            Recently shared
+          </div>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+            Latest community verdicts
+          </h2>
+        </div>
+        <p className="hidden max-w-xs text-right text-xs text-muted-foreground sm:block">
+          Read-only snapshots. No evidence, no PII — just the verdict.
+        </p>
       </div>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-        Public verdicts from the community
-      </h2>
-      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-        Every ANVIX report can be shared as a read-only link — no evidence, no PII, just the verdict.
-      </p>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {reports.map((r) => (
-          <Link
-            key={r.slug}
-            to="/r/$slug"
-            params={{ slug: r.slug }}
-            className="glass block rounded-xl border border-border/60 p-4 transition hover:border-primary/40"
-          >
-            <div className="flex items-center justify-between">
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-                style={{ background: `${tone(r.trust_score)}18`, color: tone(r.trust_score) }}
-              >
-                {r.verdict.replace("_", " ")}
-              </span>
-              <span
-                className="text-2xl font-semibold tracking-tight"
-                style={{ color: tone(r.trust_score) }}
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        {reports.map((r) => {
+          const c = tone(r.trust_score);
+          return (
+            <Link
+              key={r.slug}
+              to="/r/$slug"
+              params={{ slug: r.slug }}
+              className="glass group relative flex items-center gap-4 overflow-hidden rounded-xl border border-border/60 p-4 transition hover:-translate-y-0.5 hover:border-primary/40"
+            >
+              <div
+                className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-xl font-semibold tracking-tight"
+                style={{ background: `${c}15`, color: c, boxShadow: `inset 0 0 0 1px ${c}55` }}
               >
                 {r.trust_score}
-              </span>
-            </div>
-            <div className="mt-2 truncate text-sm font-medium">{r.case_name}</div>
-            <div className="mono mt-1 text-[10px] text-muted-foreground">/r/{r.slug}</div>
-          </Link>
-        ))}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div
+                  className="text-[10px] font-medium uppercase tracking-wide"
+                  style={{ color: c }}
+                >
+                  {r.verdict.replace(/_/g, " ")}
+                </div>
+                <div className="mt-0.5 truncate text-sm font-medium">{r.case_name}</div>
+                <div className="mono mt-0.5 truncate text-[10px] text-muted-foreground">
+                  /r/{r.slug}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
