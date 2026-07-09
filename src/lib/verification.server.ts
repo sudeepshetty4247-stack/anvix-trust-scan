@@ -205,28 +205,30 @@ export async function checkEmailAuth(
 }
 
 export async function checkWebsite(domain: string): Promise<CheckResult & { ssl: CheckResult }> {
-  const url = `https://${domain}`;
-  try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { redirect: "follow", signal: controller.signal });
-    clearTimeout(t);
-    const ok = res.status < 500;
-    return {
-      status: ok ? "pass" : "warning",
-      score: ok ? 1 : 0.4,
-      detail: `Reachable via HTTPS (status ${res.status})`,
-      data: { status: res.status, finalUrl: res.url },
-      ssl: { status: "pass", score: 1, detail: "TLS handshake succeeded" },
-    };
-  } catch (e) {
-    return {
-      status: "fail",
-      score: 0,
-      detail: `Website unreachable: ${(e as Error).message}`,
-      ssl: { status: "fail", score: 0, detail: "TLS/HTTPS handshake failed" },
-    };
-  }
+  return cached(`web:${domain}`, 5 * 60_000, async () => {
+    const url = `https://${domain}`;
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(url, { redirect: "follow", signal: controller.signal });
+      clearTimeout(t);
+      const ok = res.status < 500;
+      return {
+        status: ok ? "pass" : "warning",
+        score: ok ? 1 : 0.4,
+        detail: `Reachable via HTTPS (status ${res.status})`,
+        data: { status: res.status, finalUrl: res.url },
+        ssl: { status: "pass", score: 1, detail: "TLS handshake succeeded" },
+      } as CheckResult & { ssl: CheckResult };
+    } catch (e) {
+      return {
+        status: "fail",
+        score: 0,
+        detail: `Website unreachable: ${(e as Error).message}`,
+        ssl: { status: "fail", score: 0, detail: "TLS/HTTPS handshake failed" },
+      } as CheckResult & { ssl: CheckResult };
+    }
+  });
 }
 
 export async function checkWhois(
