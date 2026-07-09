@@ -293,11 +293,20 @@ export const runInvestigation = createServerFn({ method: "POST" })
       evidence_count: evidenceCountNorm,
       evidence_diversity: diversity,
       cross_source_consistency: crossSource,
-      suspicious_tld: anySuspiciousTld ? 1 : 0,
+      suspicious_tld: anySuspiciousTld || lookalikeDomain ? 1 : 0,
       free_email_recruiter: emails.length
         ? Math.min(1, freeEmailRecruiter / emails.length)
         : 0,
     };
+
+    // Silent-scam penalty: brand impersonation or lookalike domain forces
+    // cross-source and official-email-match to 0 so a "clean-looking" offer
+    // letter still lands in caution/high-risk territory. These are the
+    // single strongest tells for polished scams that name-drop big brands.
+    if (brandImpersonation || lookalikeDomain) {
+      features.cross_source_consistency = 0;
+      features.official_email_match = 0;
+    }
 
     // ML model interface (deterministic weighted engine calibrated in scoring.ts).
     // Selected as best model over Random Forest / XGBoost / LightGBM baselines.
