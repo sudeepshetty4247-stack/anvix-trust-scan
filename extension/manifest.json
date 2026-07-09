@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ANVIX — Job scam investigator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Right-click any suspicious message on LinkedIn, Gmail, or WhatsApp Web and investigate it with ANVIX.",
   "author": "ANVIX",
   "homepage_url": "https://anvix-trust-scan.lovable.app",

@@ -19,4 +19,4 @@ export const VERIFIED_DOMAIN_BONUS = 10;
 export const CHROME_STORE_URL = "";
 
 /** File served from /public for manual "Load unpacked" installs. */
-export const CHROME_EXTENSION_ZIP_PATH = "/anvix-scanner-v1.0.0.zip";
+export const CHROME_EXTENSION_ZIP_PATH = "/anvix-scanner-v1.1.0.zip";

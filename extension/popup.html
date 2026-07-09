@@ -2,28 +2,56 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>ANVIX</title>
+    <title>ANVIX — Job Scam Investigator</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 14px; width: 300px; background: #0b0d10; color: #f5f7fa; }
-      h1 { font-size: 14px; margin: 0 0 8px; letter-spacing: 0.02em; }
-      p { font-size: 12px; color: #a3aab3; margin: 0 0 12px; line-height: 1.4; }
-      a.btn { display: block; text-align: center; padding: 8px; background: #6b8afd; color: #0b0d10; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; margin-bottom: 10px; }
-      .recent { border-top: 1px solid #1f242a; padding-top: 10px; }
-      .recent h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #6a7079; margin: 0 0 6px; }
-      .recent ul { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 16px; width: 340px; background: #0b0d10; color: #f5f7fa; }
+      .header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+      .logo { width: 28px; height: 28px; background: linear-gradient(135deg, #6b8afd, #9f7bff); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #0b0d10; font-size: 14px; }
+      h1 { font-size: 15px; margin: 0; letter-spacing: 0.02em; }
+      .tag { font-size: 10px; color: #6b8afd; background: rgba(107,138,253,.12); padding: 2px 6px; border-radius: 4px; margin-left: auto; }
+      p.sub { font-size: 11.5px; color: #a3aab3; margin: 6px 0 12px; line-height: 1.5; }
+      textarea { width: 100%; min-height: 90px; background: #14171c; color: #f5f7fa; border: 1px solid #23282f; border-radius: 8px; padding: 10px; font-size: 12px; font-family: inherit; resize: vertical; }
+      textarea:focus { outline: none; border-color: #6b8afd; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+      button, a.btn { display: block; text-align: center; padding: 9px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 0; text-decoration: none; transition: filter .15s; }
+      .primary { background: #6b8afd; color: #0b0d10; }
+      .ghost { background: #1a1f26; color: #cdd3da; border: 1px solid #23282f; }
+      button:hover, a.btn:hover { filter: brightness(1.1); }
+      .hint { font-size: 10.5px; color: #6a7079; margin-top: 10px; padding: 8px; background: rgba(107,138,253,.06); border-left: 2px solid #6b8afd; border-radius: 4px; line-height: 1.45; }
+      .recent { border-top: 1px solid #1f242a; padding-top: 10px; margin-top: 14px; }
+      .recent h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #6a7079; margin: 0 0 6px; }
+      .recent ul { list-style: none; padding: 0; margin: 0; font-size: 11.5px; max-height: 90px; overflow-y: auto; }
       .recent li { padding: 5px 0; border-bottom: 1px solid #1f242a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cdd3da; }
       .recent li:last-child { border: 0; }
-      .empty { color: #6a7079; font-style: italic; font-size: 12px; }
+      .empty { color: #6a7079; font-style: italic; }
+      .footer { text-align: center; font-size: 10px; color: #6a7079; margin-top: 10px; }
     </style>
   </head>
   <body>
-    <h1>ANVIX</h1>
-    <p>Highlight any suspicious message on LinkedIn, Gmail or WhatsApp Web, then right-click → <b>Investigate with ANVIX</b>.</p>
-    <a class="btn" href="https://vetting-forge-ai.lovable.app/investigate" target="_blank">Open ANVIX</a>
+    <div class="header">
+      <div class="logo">A</div>
+      <h1>ANVIX</h1>
+      <span class="tag">v1.1</span>
+    </div>
+    <p class="sub">Paste any suspicious job offer, message, email or link — get an instant fraud verdict.</p>
+
+    <textarea id="evidence" placeholder="Paste the job offer, email, WhatsApp message or link here…"></textarea>
+    <div class="row">
+      <button class="primary" id="investigate">🔍 Investigate</button>
+      <button class="ghost" id="grabPage">📄 Grab this page</button>
+    </div>
+
+    <div class="hint">
+      💡 <b>Pro tip:</b> highlight text on any page, then right-click → <b>Investigate with ANVIX</b>. Works on LinkedIn, Gmail, WhatsApp Web, Outlook.
+    </div>
+
     <div class="recent">
-      <h2>Recent</h2>
+      <h2>Recent investigations</h2>
       <ul id="recent"></ul>
     </div>
+
+    <div class="footer">Powered by ANVIX Trust Scan</div>
     <script src="popup.js"></script>
   </body>
 </html>
