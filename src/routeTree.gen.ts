@@ -18,6 +18,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as ApiPublicQuickScanRouteImport } from './routes/api.public.quick-scan'
 import { Route as AuthenticatedInvestigationsIdRouteImport } from './routes/_authenticated/investigations.$id'
 import { Route as ApiPublicCardSlugRouteImport } from './routes/api.public.card.$slug'
 
@@ -65,6 +66,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicQuickScanRoute = ApiPublicQuickScanRouteImport.update({
+  id: '/api/public/quick-scan',
+  path: '/api/public/quick-scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedInvestigationsIdRoute =
   AuthenticatedInvestigationsIdRouteImport.update({
     id: '/investigations/$id',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/r/$slug': typeof RSlugRoute
   '/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
+  '/api/public/quick-scan': typeof ApiPublicQuickScanRoute
   '/api/public/card/$slug': typeof ApiPublicCardSlugRoute
 }
 export interface FileRoutesByTo {
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/r/$slug': typeof RSlugRoute
   '/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
+  '/api/public/quick-scan': typeof ApiPublicQuickScanRoute
   '/api/public/card/$slug': typeof ApiPublicCardSlugRoute
 }
 export interface FileRoutesById {
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/r/$slug': typeof RSlugRoute
   '/_authenticated/investigations/$id': typeof AuthenticatedInvestigationsIdRoute
+  '/api/public/quick-scan': typeof ApiPublicQuickScanRoute
   '/api/public/card/$slug': typeof ApiPublicCardSlugRoute
 }
 export interface FileRouteTypes {
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/r/$slug'
     | '/investigations/$id'
+    | '/api/public/quick-scan'
     | '/api/public/card/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/r/$slug'
     | '/investigations/$id'
+    | '/api/public/quick-scan'
     | '/api/public/card/$slug'
   id:
     | '__root__'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/r/$slug'
     | '/_authenticated/investigations/$id'
+    | '/api/public/quick-scan'
     | '/api/public/card/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   InvestigateRoute: typeof InvestigateRoute
   PrivacyRoute: typeof PrivacyRoute
   RSlugRoute: typeof RSlugRoute
+  ApiPublicQuickScanRoute: typeof ApiPublicQuickScanRoute
   ApiPublicCardSlugRoute: typeof ApiPublicCardSlugRoute
 }
 
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/quick-scan': {
+      id: '/api/public/quick-scan'
+      path: '/api/public/quick-scan'
+      fullPath: '/api/public/quick-scan'
+      preLoaderRoute: typeof ApiPublicQuickScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/investigations/$id': {
       id: '/_authenticated/investigations/$id'
       path: '/investigations/$id'
@@ -271,6 +291,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvestigateRoute: InvestigateRoute,
   PrivacyRoute: PrivacyRoute,
   RSlugRoute: RSlugRoute,
+  ApiPublicQuickScanRoute: ApiPublicQuickScanRoute,
   ApiPublicCardSlugRoute: ApiPublicCardSlugRoute,
 }
 export const routeTree = rootRouteImport
